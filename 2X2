@@ -1,0 +1,3682 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Ambiente Cósmico — Batalha de Heróis (Wanda, Fate, Magneto, Emma Frost, Ice Man & Phoenix)</title>
+<style>
+  :root{ --panel-bg:rgba(10,12,20,.62); --panel-brd:rgba(255,255,255,.16); --txt:#e8ecff; }
+  html,body{ height:100% }
+  body{ margin:0; overflow:hidden; background:radial-gradient(1200px 800px at 50% 50%, #05060b 0%, #02030b 60%, #000 100%); color:var(--txt); font-family:system-ui, Segoe UI, Roboto, Helvetica, Arial; }
+  canvas{ display:block; }
+
+  .panel{ position:fixed; top:14px; left:14px; z-index:2; background:var(--panel-bg); border:1px solid var(--panel-brd); backdrop-filter:blur(6px); border-radius:12px; padding:12px 14px; max-width:740px; box-shadow:0 8px 30px rgba(0,0,0,.35); user-select:none; transition:transform .22s ease, opacity .22s ease; }
+  .panel h2{ margin:0 0 8px; font-size:14px; letter-spacing:.3px; color:#cfd7ff; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .grid{ display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; }
+  .grid input[type=range]{ width:260px }
+  .grid select, .grid input[type=checkbox], .grid input[type=color]{ accent-color:#4f7cff }
+  .grid select, .grid input[type=text]{ width:260px; padding:4px 6px; border-radius:8px; border:1px solid var(--panel-brd); background:#0f1733; color:var(--txt) }
+  .btns{ display:flex; gap:8px; margin-top:8px; flex-wrap:wrap }
+  button{ background:#0f1733; color:#e9efff; border:1px solid var(--panel-brd); padding:6px 10px; border-radius:10px; cursor:pointer; font-size:12px }
+  button:hover{ border-color:#2b3d7a }
+  .hint{ font-size:11px; opacity:.85; margin-top:6px }
+  .badge{ padding:2px 8px; border-radius:999px; font-size:10px; background:#1a2147; border:1px solid var(--panel-brd) }
+
+  .panel.collapsed{ transform:translateX(calc(-100% + 24px)); opacity:.04; pointer-events:none }
+  #uiToggle{ position:fixed; top:14px; left:14px; z-index:3; background:var(--panel-bg); border:1px solid var(--panel-brd); border-radius:999px; padding:6px 10px; cursor:pointer; font-size:12px; display:none; color:var(--txt) }
+
+  .scoreboard{ position:fixed; top:14px; right:14px; z-index:2; display:flex; align-items:center; gap:8px; background:var(--panel-bg); border:1px solid var(--panel-brd); backdrop-filter:blur(6px); padding:8px 12px; border-radius:12px; box-shadow:0 8px 30px rgba(0,0,0,.35); font-weight:600 }
+  .scoreboard .team{ font-size:12px; opacity:.95; display:flex; align-items:center; gap:6px }
+  .scoreboard .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; border:1px solid rgba(255,255,255,.35) }
+  .scoreboard .score{ font-size:16px; min-width:22px; text-align:center }
+  .scoreboard .sep{ opacity:.6 }
+
+  #iaPanel{ left:auto; right:14px; top:70px; max-width:480px }
+  #iaPanel.collapsed{ transform:none; opacity:0; pointer-events:none }
+  .sectionTitle{ margin:8px 0 2px; font-size:12px; opacity:.9; border-top:1px dashed var(--panel-brd); padding-top:8px }
+
+/* ===== Scroll em painéis (IA & afins) ===== */
+#iaPanel{
+  max-height: min(92vh, 860px);
+  overflow-y: auto;
+  overscroll-behavior: contain; /* evita “puxar” a página ao rolar */
+}
+#iaPanel .grid{
+  max-height: calc(92vh - 160px); /* ajuste conforme o cabeçalho/botões */
+  overflow-y: auto;
+  padding-right: .5rem; /* espaço pro thumb da barra */
+}
+/* Opcional: quando o select estiver expandido (size>1) */
+select.open{
+  max-height: 300px;
+  overflow-y: auto;
+}
+/* (Opcional) Estiliza a barra no Chromium/WebKit */
+#iaPanel::-webkit-scrollbar{ width: 10px; }
+#iaPanel::-webkit-scrollbar-track{ background: rgba(255,255,255,.06); }
+#iaPanel::-webkit-scrollbar-thumb{ background: rgba(255,255,255,.22); border-radius: 8px; }
+#iaPanel::-webkit-scrollbar-thumb:hover{ background: rgba(255,255,255,.32); }
+</style>
+</head>
+<body>
+<canvas id="cosmos"></canvas>
+<button id="uiToggle" title="Mostrar interface (U)">Mostrar UI</button>
+
+<div class="scoreboard" aria-label="Placar">
+  <span class="team"><i class="dot" id="dotA" style="background:#ff69b4"></i><span id="nameA">Player 1</span></span>
+  <span id="scorePink" class="score">0</span>
+  <span class="sep">×</span>
+  <span id="scoreYellow" class="score">0</span>
+  <span class="team"><i class="dot" id="dotB" style="background:#ffd400"></i><span id="nameB">Player 2</span></span>
+</div>
+<div class="scoreboard" id="pairingBar" aria-label="Duplas" style="margin-top:8px; font-weight:500; font-size:12px">
+  <span id="pairingLeft"></span>
+  <span class="sep" style="margin:0 6px">×</span>
+  <span id="pairingRight"></span>
+</div>
+
+
+<!-- Painel principal -->
+<div class="panel" id="panel">
+  <h2>
+    ⚙️ Controles Cósmicos
+    <span class="badge" id="fps">60 fps</span>
+    <span class="badge" id="starCount">1 estrela</span>
+    <span class="badge" id="zoomBadge">100%</span>
+    <span class="badge" id="uniBadge">Universo 1×</span>
+    <span class="badge" id="scoreA">Pink 0</span>
+    <span class="badge" id="scoreB">Yellow 0</span>
+  </h2>
+
+  <div class="grid">
+    <label>Tipo da nova estrela</label>
+    <select id="starType">
+      <option value="sun">Sequência Principal (Sol)</option>
+      <option value="white_dwarf">Anã Branca</option>
+      <option value="neutron">Estrela de Nêutrons</option>
+      <option value="pulsar">Pulsar</option>
+      <option value="magnetar" selected>Magnetar</option>
+      <option value="supergiant">Supergigante</option>
+      <option value="black_hole">Buraco Negro</option>
+    </select>
+    <label>Modo de jogo</label>
+    <select id="gameMode">
+      <option value="1v1" selected>1×1</option>
+      <option value="2v2">2×2</option>
+    </select>
+
+
+    <label>Tamanho (nova estrela)</label><input id="starSize" type="range" min="6" max="80" step="1" value="26">
+    <label>Velocidade base (heróis)</label><input id="speed" type="range" min="0" max="8" step="0.1" value="2.0">
+    <label>Gravidade (G global)</label><input id="gravity" type="range" min="0" max="8000" step="10" value="1800">
+    <label>Expoente de queda</label><input id="falloff" type="range" min="1.5" max="3.0" step="0.01" value="2.00">
+    <label>Raio de influência</label><input id="influence" type="range" min="80" max="1600" step="5" value="520">
+    <label>Arrasto (drag)</label><input id="drag" type="range" min="0" max="0.2" step="0.002" value="0.02">
+    <label>Segundos de rastro</label><input id="trailSecs" type="range" min="0.3" max="10" step="0.1" value="4">
+    <label>Largura do rastro</label><input id="trailW" type="range" min="1" max="6" step="0.5" value="2">
+    <label>Fade do fundo</label><input id="fade" type="range" min="0.02" max="0.6" step="0.01" value="0.14">
+    <label>Estrelas de fundo</label><input id="starfield" type="range" min="0" max="800" step="20" value="360">
+    <label>Curvar órbita</label><input id="curve" type="range" min="0" max="1" step="0.01" value="0.15">
+    <label>Zoom (rodinha/pinça)</label><input id="zoom" type="range" min="0.3" max="3.0" step="0.01" value="1.00">
+
+    <label>⚔️ Batalha automática</label><input id="battle" type="checkbox" checked>
+    <label>Raio de engajamento</label><input id="engage" type="range" min="100" max="700" step="10" value="260">
+    <label>Dano global (mult.)</label><input id="dmg" type="range" min="0.5" max="3" step="0.1" value="1.2">
+    <label>Supernovas (freq.)</label><input id="supernovaRate" type="range" min="0" max="1" step="0.01" value="0">
+
+    <label>Cooldown do raio (s)</label><input id="boltCd" type="range" min="0.2" max="6" step="0.1" value="2.0">
+    <label>Dano do raio (0 = nenhum, 1 = kill)</label><input id="boltDmg" type="range" min="0" max="1" step="0.01" value="1">
+    <label>Velocidade do raio (global)</label><input id="boltSpeed" type="range" min="4" max="30" step="0.5" value="12">
+    <label>Cooldown dos orbes (s)</label><input id="orbCd" type="range" min="0.2" max="6" step="0.1" value="2.5">
+    <label>Viés orbital dos orbes</label><input id="orbSwirl" type="range" min="0" max="1" step="0.01" value="0.85">
+
+    <!-- 🔵 Ajustes da ULT do Magneto -->
+    <div class="sectionTitle">ULT do Magneto – Gravidade nos Alvos</div><div></div>
+    <label>G ULT (alvo)</label><input id="magUltG" type="range" min="0" max="12000" step="20" value="5200">
+    <label>Raio ULT (alvo)</label><input id="magUltR" type="range" min="120" max="1200" step="5" value="420">
+
+    <label>Som</label><input id="sndOn" type="checkbox" checked>
+    <label>Volume</label><input id="sndVol" type="range" min="0" max="1" step="0.01" value="0.35">
+
+    <label>Magias ativas</label>
+    <div>
+      <label><input id="mBolt" type="checkbox" checked> Raio</label>
+      <label style="margin-left:10px"><input id="mOrb" type="checkbox" checked> Orbe</label>
+      <label style="margin-left:10px"><input id="mWave" type="checkbox" checked> Pulso</label>
+      <label style="margin-left:10px"><input id="mShield" type="checkbox" checked> Escudo</label>
+    </div>
+  </div>
+
+  <div class="btns">
+    <button id="addStar">Adicionar estrela (+)</button>
+    <button id="removeStar">Remover última</button>
+    <button id="clearStars">Limpar estrelas</button>
+    <button id="randomize">Direções aleatórias</button>
+    <button id="recenter">Recentrar (média)</button>
+    <button id="reset">Reset heróis</button>
+    <button id="pause">Pausar</button>
+    <button id="zeroV">Zerar vel.</button>
+    <button id="fullscreen">Tela cheia</button>
+    <button id="resetView">Reset visão</button>
+    <button id="toggleUI">Ocultar UI (U)</button>
+    <button id="expandU">Expandir Universo +25%</button>
+    <button id="resetBattle">Reset batalha</button>
+    <button id="toggleIA">Menu IA (I)</button>
+    <button id="ultA">ULT P1 (1)</button>
+    <button id="ultB">ULT P2 (2)</button>
+    <button id="addHeroA">+ Herói P1</button>
+    <button id="addHeroB">+ Herói P2</button>
+  </div>
+  <div class="hint">
+    Dicas: <kbd>Shift</kbd>=warp ×3 • <kbd>Alt</kbd>+arrastar move estrela • <kbd>Ctrl</kbd>+clique cria.
+    Roda=zoom • <kbd>Espaço</kbd>=pan • 2×clique=reset visão • Bordas <strong>não</strong> causam dano (apenas ricochete).
+  </div>
+</div>
+
+<!-- Painel IA (sem Nitro/Atrasos — sliders por herói) -->
+<div class="panel" id="iaPanel">
+  <h2>🧠 IA & Presets</h2>
+  <div class="grid">
+    <!-- PINK -->
+    <div class="sectionTitle">Player 1</div><div></div>
+    <label>Herói</label>
+    <select id="hHeroA">
+      <option value="wanda" selected>Wanda Maximoff (Escarlate)</option>
+      <option value="fate">Doctor Fate (Dourado)</option>
+      <option value="magneto">Magneto (Magnético)</option>
+      <option value="loki">Loki (Verde)</option>
+      <option value="iceman">Ice Man (Azul Celeste)</option>
+      <option value="emma">Emma Frost (Diamante)</option>
+      <option value="phoenix">Jean Grey (Fênix)</option>
+    </select>
+    <label>Nome</label><input id="hNameA" type="text" value="Wanda"/>
+    <label>Cor</label><input id="hColorA" type="color" value="#ff1744"/>
+    <label>HP Máx</label><input id="hHpA" type="range" min="60" max="400" step="5" value="120">
+    <label>Velocidade</label><input id="hSpeedA" type="range" min="0" max="8" step="0.1" value="2.1">
+    <label>Velocidade de Raios</label><input id="hBoltSpeedA" type="range" min="4" max="30" step="0.5" value="12">
+    <label>Taxa de Disparo (bolts)</label><input id="hBoltRateA" type="range" min="0.25" max="3" step="0.05" value="1">
+    <label>Cooldown da ULT (s)</label><input id="hUltCdA" type="range" min="4" max="60" step="0.5" value="22">
+    <label>Precisão do raio</label><input id="accBoltA" type="range" min="0" max="1" step="0.01" value="0.75">
+    <label>Estilo</label>
+    <select id="hStyleA">
+      <option value="attack">Ataque</option>
+      <option value="balanced" selected>Balanceado</option>
+      <option value="defense">Defesa</option>
+    </select>
+    <label>Auto-ULT</label><input id="autoUltA" type="checkbox" checked>
+
+    <!-- YELLOW -->
+    <div class="sectionTitle">Player 2</div><div></div>
+    <label>Herói</label>
+    <select id="hHeroB">
+      <option value="wanda">Wanda Maximoff (Escarlate)</option>
+      <option value="fate" selected>Doctor Fate (Dourado)</option>
+      <option value="magneto">Magneto (Magnético)</option>
+      <option value="loki">Loki (Verde)</option>
+      <option value="iceman">Ice Man (Azul Celeste)</option>
+      <option value="emma">Emma Frost (Diamante)</option>
+      <option value="phoenix">Jean Grey (Fênix)</option>
+    </select>
+    <label>Nome</label><input id="hNameB" type="text" value="Fate"/>
+    <label>Cor</label><input id="hColorB" type="color" value="#ffd400"/>
+    <label>HP Máx</label><input id="hHpB" type="range" min="60" max="400" step="5" value="110">
+    <label>Velocidade</label><input id="hSpeedB" type="range" min="0" max="8" step="0.1" value="2.0">
+    <label>Velocidade de Raios</label><input id="hBoltSpeedB" type="range" min="4" max="30" step="0.5" value="12">
+    <label>Taxa de Disparo (bolts)</label><input id="hBoltRateB" type="range" min="0.25" max="3" step="0.05" value="1">
+    <label>Cooldown da ULT (s)</label><input id="hUltCdB" type="range" min="4" max="60" step="0.5" value="22">
+    <label>Precisão do raio</label><input id="accBoltB" type="range" min="0" max="1" step="0.01" value="0.75">
+    <label>Estilo</label>
+    <select id="hStyleB">
+      <option value="attack">Ataque</option>
+      <option value="balanced" selected>Balanceado</option>
+      <option value="defense">Defesa</option>
+    </select>
+    <label>Auto-ULT</label><input id="autoUltB" type="checkbox" checked>
+
+    
+<!-- PINK 2 (slot C do time A) -->
+<div id="p3Block" class="player-block">
+<div class="sectionTitle">Player 3</div><div></div>
+<label>Herói</label>
+<select id="hHeroC"></select>
+<label>Nome</label><input id="hNameC" type="text" value="Player 3"/>
+<label>Cor</label><input id="hColorC" type="color" value="#00d4ff"/>
+<label>HP Máx</label><input id="hHpC" type="range" min="60" max="400" step="5" value="120">
+<label>Velocidade</label><input id="hSpeedC" type="range" min="0" max="8" step="0.1" value="2.0">
+<label>Velocidade de Raios</label><input id="hBoltSpeedC" type="range" min="4" max="30" step="0.5" value="12">
+<label>Taxa de Disparo (bolts)</label><input id="hBoltRateC" type="range" min="0.25" max="3" step="0.05" value="1">
+<label>Cooldown da ULT (s)</label><input id="hUltCdC" type="range" min="4" max="60" step="0.5" value="22">
+<label>Precisão do raio</label><input id="accBoltC" type="range" min="0" max="1" step="0.01" value="0.75">
+<label>Estilo</label>
+<select id="hStyleC">
+  <option value="attack">Ataque</option>
+  <option value="balanced" selected>Balanceado</option>
+  <option value="defense">Defesa</option>
+</select>
+<label>Auto-ULT</label><input id="autoUltC" type="checkbox" checked>
+</div><!-- /#p3Block -->
+
+<!-- YELLOW 2 (slot D do time B) -->
+<div id="p4Block" class="player-block">
+<div class="sectionTitle">Player 4</div><div></div>
+<label>Herói</label>
+<select id="hHeroD"></select>
+<label>Nome</label><input id="hNameD" type="text" value="Player 4"/>
+<label>Cor</label><input id="hColorD" type="color" value="#808080"/>
+<label>HP Máx</label><input id="hHpD" type="range" min="60" max="400" step="5" value="110">
+<label>Velocidade</label><input id="hSpeedD" type="range" min="0" max="8" step="0.1" value="2.0">
+<label>Velocidade de Raios</label><input id="hBoltSpeedD" type="range" min="4" max="30" step="0.5" value="12">
+<label>Taxa de Disparo (bolts)</label><input id="hBoltRateD" type="range" min="0.25" max="3" step="0.05" value="1">
+<label>Cooldown da ULT (s)</label><input id="hUltCdD" type="range" min="4" max="60" step="0.5" value="22">
+<label>Precisão do raio</label><input id="accBoltD" type="range" min="0" max="1" step="0.01" value="0.75">
+<label>Estilo</label>
+<select id="hStyleD">
+  <option value="attack">Ataque</option>
+  <option value="balanced" selected>Balanceado</option>
+  <option value="defense">Defesa</option>
+</select>
+<label>Auto-ULT</label><input id="autoUltD" type="checkbox" checked>
+</div><!-- /#p4Block -->
+<!-- PRESETS -->
+    <div class="sectionTitle">Presets</div><div></div>
+    <label>Selecionar</label><select id="presetSelect"></select>
+    <label>Nome (salvar)</label><input id="presetName" type="text" placeholder="Meu preset"/>
+  </div>
+  <div class="btns">
+    <button id="presetApply">Aplicar</button>
+    <button id="presetSave">Salvar preset</button>
+    <button id="presetDelete">Excluir preset</button>
+    <button id="closeIA">Fechar IA</button>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   COSMOS — Núcleo de UI e Configs por Herói (Parte 1/4)
+   Mudanças principais:
+   • Adicionado herói: Phoenix (Fênix).
+   • Passiva/ULT da Phoenix implementadas nas Partes 3/4.
+   • Adicionado slider no Menu IA: "Taxa de Disparo (bolts)" por herói.
+   ========================================================= */
+(() => {
+// ---------- Utils ----------
+const ui = id => document.getElementById(id);
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const hexToRgba=(hex,a=1)=>{ if(!hex) return `rgba(255,255,255,${a})`;
+  const h=hex.replace('#',''); const b=parseInt(h.length===3?h.split('').map(c=>c+c).join(''):h,16);
+  const r=(b>>16)&255,g=(b>>8)&255,bl=b&255; return `rgba(${r},${g},${bl},${a})`;
+};
+
+// ---------- Mapa da UI ----------
+const U = {
+  // Placar
+  nameA: ui('nameA'), nameB: ui('nameB'), dotA: ui('dotA'), dotB: ui('dotB'),
+  scorePinkEl: ui('scorePink'), scoreYellowEl: ui('scoreYellow'),
+  scoreA: ui('scoreA'), scoreB: ui('scoreB'),
+  pairingBar: ui('pairingBar'), pairingLeft: ui('pairingLeft'), pairingRight: ui('pairingRight'),
+
+  // Globais
+  starType: ui('starType'), starSize: ui('starSize'),
+  speed: ui('speed'), gravity: ui('gravity'), falloff: ui('falloff'), influence: ui('influence'),
+  drag: ui('drag'), trailSecs: ui('trailSecs'), trailW: ui('trailW'), fade: ui('fade'),
+  starfield: ui('starfield'), curve: ui('curve'), zoom: ui('zoom'),
+  battle: ui('battle'), engage: ui('engage'), dmg: ui('dmg'), supernovaRate: ui('supernovaRate'),
+
+  boltCd: ui('boltCd'), boltDmg: ui('boltDmg'), boltSpeed: ui('boltSpeed'),
+  orbCd: ui('orbCd'), orbSwirl: ui('orbSwirl'),
+
+  gameMode: ui('gameMode'),
+
+  // 🔵 Ajustes ULT Magneto (alvos)
+  magUltG: ui('magUltG'), magUltR: ui('magUltR'),
+
+  sndOn: ui('sndOn'), sndVol: ui('sndVol'),
+  mBolt: ui('mBolt'), mOrb: ui('mOrb'), mWave: ui('mWave'), mShield: ui('mShield'),
+
+  // Botões principais
+  addStar: ui('addStar'), removeStar: ui('removeStar'), clearStars: ui('clearStars'),
+  randomize: ui('randomize'), recenter: ui('recenter'), reset: ui('reset'), pause: ui('pause'),
+  zeroV: ui('zeroV'), fullscreen: ui('fullscreen'), resetView: ui('resetView'),
+  expandU: ui('expandU'), resetBattle: ui('resetBattle'), toggleUI: ui('toggleUI'),
+  fps: ui('fps'), starCount: ui('starCount'), zoomBadge: ui('zoomBadge'), uniBadge: ui('uniBadge'),
+  ultA: ui('ultA'), ultB: ui('ultB'), addHeroA: ui('addHeroA'), addHeroB: ui('addHeroB'),
+
+  // Painel IA por herói
+  iaPanel: ui('iaPanel'), toggleIA: ui('toggleIA'), closeIA: ui('closeIA'),
+  // A
+  hHeroA: ui('hHeroA'), hNameA: ui('hNameA'), hColorA: ui('hColorA'),
+  hHpA: ui('hHpA'), hSpeedA: ui('hSpeedA'), hBoltSpeedA: ui('hBoltSpeedA'), hBoltRateA: ui('hBoltRateA'), hUltCdA: ui('hUltCdA'),
+  accBoltA: ui('accBoltA'), hStyleA: ui('hStyleA'), autoUltA: ui('autoUltA'),
+  // B
+  hHeroB: ui('hHeroB'), hNameB: ui('hNameB'), hColorB: ui('hColorB'),
+  hHpB: ui('hHpB'), hSpeedB: ui('hSpeedB'), hBoltSpeedB: ui('hBoltSpeedB'), hBoltRateB: ui('hBoltRateB'), hUltCdB: ui('hUltCdB'),
+  accBoltB: ui('accBoltB'), hStyleB: ui('hStyleB'), autoUltB: ui('autoUltB'),
+
+// C
+hHeroC: ui('hHeroC'), hNameC: ui('hNameC'), hColorC: ui('hColorC'),
+hHpC: ui('hHpC'), hSpeedC: ui('hSpeedC'), hBoltSpeedC: ui('hBoltSpeedC'), hBoltRateC: ui('hBoltRateC'), hUltCdC: ui('hUltCdC'),
+accBoltC: ui('accBoltC'), hStyleC: ui('hStyleC'), autoUltC: ui('autoUltC'),
+// D
+hHeroD: ui('hHeroD'), hNameD: ui('hNameD'), hColorD: ui('hColorD'),
+hHpD: ui('hHpD'), hSpeedD: ui('hSpeedD'), hBoltSpeedD: ui('hBoltSpeedD'), hBoltRateD: ui('hBoltRateD'), hUltCdD: ui('hUltCdD'),
+accBoltD: ui('accBoltD'), hStyleD: ui('hStyleD'), autoUltD: ui('autoUltD'),
+
+  // Presets
+  presetSelect: ui('presetSelect'), presetName: ui('presetName'),
+  presetApply: ui('presetApply'), presetSave: ui('presetSave'), presetDelete: ui('presetDelete')
+};
+
+// ---------- Constantes ----------
+const NITRO = { force: 3.0, cap: 3.0, recharge: 0.8 };
+const THINK = { min: 0.12, max: 0.26 };
+
+// ---------- Kits ----------
+const HERO_KITS = {
+  wanda:   { key:'wanda',   name:'Wanda',   full:'Wanda Maximoff', label:'Wanda Maximoff (Escarlate)', base:'#ff1744',
+             hp:160, speedMul:1.18, boltMul:1.18, ultCd:18, accBolt:0.84, think:THINK, ultName:'Piscar Escarlate' },
+  fate:    { key:'fate',    name:'Fate',    full:'Doctor Fate',    label:'Doctor Fate (Dourado)',      base:'#ffd400',
+             hp:150, speedMul:1.12, boltMul:1.12, ultCd:18, accBolt:0.83, think:THINK, ultName:'Ankh Dourada' },
+  magneto: { key:'magneto', name:'Magneto', full:'Magneto',        label:'Magneto (Magnético)',        base:'#7f8cff',
+             hp:170, speedMul:1.10, boltMul:1.24, ultCd:20, accBolt:0.86, think:THINK, ultName:'Colapso Magnético' },
+  loki:    { key:'loki',    name:'Loki',    full:'Loki Laufeyson', label:'Loki (Verde)',                base:'#00c853',
+             hp:145, speedMul:1.20, boltMul:1.20, ultCd:16, accBolt:0.85, think:THINK, ultName:'Espelhos do Trapaceiro' },
+  iceman:  { key:'iceman',  name:'Ice Man', full:'Ice Man',        label:'Ice Man (Azul Celeste)',     base:'#8fdcff',
+             hp:165, speedMul:1.12, boltMul:1.10, ultCd:20, accBolt:0.87, think:THINK, ultName:'Explosão Congelante' },
+  emma:    { key:'emma',    name:'Emma',    full:'Emma Frost',     label:'Emma Frost (Diamante)',       base:'#d5f3ff',
+             hp:175, speedMul:1.08, boltMul:1.08, ultCd:18, accBolt:0.82, think:THINK, ultName:'Estase Telepática' },
+  phoenix: { key:'phoenix', name:'Fênix',   full:'Jean Grey',      label:'Jean Grey (Fênix)',           base:'#ff6d00',
+             hp:170, speedMul:1.16, boltMul:1.18, ultCd:22, accBolt:0.86, think:THINK, ultName:'Fogo da Fênix' }
+};
+
+// ---------- Config atual ----------
+const teamCfg = {
+  A: { kit:'wanda',   name:'Wanda', color:'#ff1744', hp:120, speedMul:1.05, boltMul:1.00, boltRate:1.00, ultCd:22, accBolt:0.75, style:'balanced', autoUlt:true },
+  B: { kit:'fate',    name:'Fate',  color:'#ffd400', hp:110, speedMul:1.00, boltMul:0.96, boltRate:1.00, ultCd:22, accBolt:0.74, style:'balanced', autoUlt:true }
+
+, C: { kit:'iceman',  name:'Pink 2',  color:'#00d4ff', hp:120, speedMul:1.00, boltMul:1.00, boltRate:1.00, ultCd:22, accBolt:0.75, style:'balanced', autoUlt:true }
+, D: { kit:'magneto', name:'Yellow 2', color:'#808080', hp:110, speedMul:1.00, boltMul:1.00, boltRate:1.00, ultCd:22, accBolt:0.75, style:'balanced', autoUlt:true }};
+
+// ---------- Sincronização UI <-> Config ----------
+
+function syncScoreboard(){
+  const U = (window.__COSMO_CFG__||{}).U || {};
+  const label = (cfg, fallback) => (cfg && (cfg.name||'').trim()) || fallback;
+  if(U.nameA) U.nameA.textContent = label(teamCfg.A, 'Player 1');
+  if(U.nameB) U.nameB.textContent = label(teamCfg.B, 'Player 2');
+  if(U.dotA)  U.dotA.style.background = teamCfg.A.color || '#ff69b4';
+  if(U.dotB)  U.dotB.style.background = teamCfg.B.color || '#ffd400';
+  if(U.scoreA && U.nameA && U.scorePinkEl)   U.scoreA.textContent = ${U.nameA.textContent} ${U.scorePinkEl.textContent}`;
+  if(U.scoreB && U.nameB && U.scoreYellowEl) U.scoreB.textContent = `${U.scoreYellowEl.textContent} ${U.nameB.textContent}`;
+  const mode = (U.gameMode && U.gameMode.value) || '2v2';
+  const kitName = cfg => { const k = HERO_KITS[cfg.kit]||{}; return k.full||k.name||cfg.name||'Herói'; };
+  const nameOrKit = cfg => label(cfg, kitName(cfg));
+  const leftNames  = (mode==='2v2') ? [nameOrKit(teamCfg.A), nameOrKit(teamCfg.C||teamCfg.A)].join(', ') : nameOrKit(teamCfg.A);
+  const rightNames = (mode==='2v2') ? [nameOrKit(teamCfg.B), nameOrKit(teamCfg.D||teamCfg.B)].join(', ') : nameOrKit(teamCfg.B);
+  if(U.pairingLeft)  U.pairingLeft.textContent  = leftNames;
+  if(U.pairingRight) U.pairingRight.textContent = rightNames;
+  if(U.pairingBar)   U.pairingBar.style.display = (mode==='2v2') ? 'flex' : 'none';
+}
+function applyKitToUI(team, kitKey){
+  const sel = team==='A'?U.hHeroA: team==='B'?U.hHeroB: team==='C'?U.hHeroC: U.hHeroD;
+  const kit = HERO_KITS[kitKey]; if(!kit) return;
+  sel.value = kitKey;
+  const M = team==='A'?{H:U.hHeroA,N:U.hNameA,C:U.hColorA,hp:U.hHpA,sp:U.hSpeedA,bs:U.hBoltSpeedA,br:U.hBoltRateA,uc:U.hUltCdA,ac:U.accBoltA,st:U.hStyleA,au:U.autoUltA}
+          : team==='B'?{H:U.hHeroB,N:U.hNameB,C:U.hColorB,hp:U.hHpB,sp:U.hSpeedB,bs:U.hBoltSpeedB,br:U.hBoltRateB,uc:U.hUltCdB,ac:U.accBoltB,st:U.hStyleB,au:U.autoUltB}
+          : team==='C'?{H:U.hHeroC,N:U.hNameC,C:U.hColorC,hp:U.hHpC,sp:U.hSpeedC,bs:U.hBoltSpeedC,br:U.hBoltRateC,uc:U.hUltCdC,ac:U.accBoltC,st:U.hStyleC,au:U.autoUltC} 
+                      :{H:U.hHeroD,N:U.hNameD,C:U.hColorD,hp:U.hHpD,sp:U.hSpeedD,bs:U.hBoltSpeedD,br:U.hBoltRateD,uc:U.hUltCdD,ac:U.accBoltD,st:U.hStyleD,au:U.autoUltD};
+  if(team==='C' || team==='D'){ M.N.value = kit.name; } else if(!(M.N.value||'').trim()){ M.N.value = kit.name; }
+  M.C.value = kit.base || kit.color || '#ffffff';
+  M.hp.value = kit.hp;
+  M.sp.value = (kit.speedMul*2).toFixed(2);
+  M.bs.value = (kit.boltMul*12).toFixed(2);
+  M.br.value = (1.00).toFixed(2);
+  M.uc.value = kit.ultCd;
+  M.ac.value = kit.accBolt;
+  syncCfgFromUI(team);
+  syncScoreboard && syncScoreboard();
+}
+
+function syncUIFromCfg(team){
+  const c = teamCfg[team];
+  const M = team==='A'?{H:U.hHeroA,N:U.hNameA,C:U.hColorA,hp:U.hHpA,sp:U.hSpeedA,bs:U.hBoltSpeedA,br:U.hBoltRateA,uc:U.hUltCdA,ac:U.accBoltA,st:U.hStyleA,au:U.autoUltA}
+          : team==='B'?{H:U.hHeroB,N:U.hNameB,C:U.hColorB,hp:U.hHpB,sp:U.hSpeedB,bs:U.hBoltSpeedB,br:U.hBoltRateB,uc:U.hUltCdB,ac:U.accBoltB,st:U.hStyleB,au:U.autoUltB}
+          : team==='C'?{H:U.hHeroC,N:U.hNameC,C:U.hColorC,hp:U.hHpC,sp:U.hSpeedC,bs:U.hBoltSpeedC,br:U.hBoltRateC,uc:U.hUltCdC,ac:U.accBoltC,st:U.hStyleC,au:U.autoUltC}
+                      :{H:U.hHeroD,N:U.hNameD,C:U.hColorD,hp:U.hHpD,sp:U.hSpeedD,bs:U.hBoltSpeedD,br:U.hBoltRateD,uc:U.hUltCdD,ac:U.accBoltD,st:U.hStyleD,au:U.autoUltD};
+  M.H.value=c.kit; M.N.value=c.name; M.C.value=c.color;
+  M.hp.value=c.hp; M.sp.value=(c.speedMul*2).toFixed(2);
+  M.bs.value=(c.boltMul*12).toFixed(2);
+  const br = (c.boltRateMul!=null ? c.boltRateMul : (c.boltRate!=null ? c.boltRate : 1));
+  M.br.value=(br).toFixed(2);
+  M.uc.value=c.ultCd;
+  M.ac.value=c.accBolt; M.st.value=c.style; M.au.checked=!!c.autoUlt;
+  syncScoreboard && syncScoreboard();
+}
+
+function syncCfgFromUI(team){
+  const M = team==='A'?{H:U.hHeroA,N:U.hNameA,C:U.hColorA,hp:U.hHpA,sp:U.hSpeedA,bs:U.hBoltSpeedA,br:U.hBoltRateA,uc:U.hUltCdA,ac:U.accBoltA,st:U.hStyleA,au:U.autoUltA}
+          : team==='B'?{H:U.hHeroB,N:U.hNameB,C:U.hColorB,hp:U.hHpB,sp:U.hSpeedB,bs:U.hBoltSpeedB,br:U.hBoltRateB,uc:U.hUltCdB,ac:U.accBoltB,st:U.hStyleB,au:U.autoUltB}
+          : team==='C'?{H:U.hHeroC,N:U.hNameC,C:U.hColorC,hp:U.hHpC,sp:U.hSpeedC,bs:U.hBoltSpeedC,br:U.hBoltRateC,uc:U.hUltCdC,ac:U.accBoltC,st:U.hStyleC,au:U.autoUltC}
+                      :{H:U.hHeroD,N:U.hNameD,C:U.hColorD,hp:U.hHpD,sp:U.hSpeedD,bs:U.hBoltSpeedD,br:U.hBoltRateD,uc:U.hUltCdD,ac:U.accBoltD,st:U.hStyleD,au:U.autoUltD};
+  const read = {
+    kit: M.H.value, name: M.N.value, color: M.C.value,
+    hp: +M.hp.value, speedMul: clamp(+M.sp.value/2, 0, 4),
+    boltMul: clamp(+M.bs.value/12, 0.1, 4),
+    boltRateMul: clamp(+M.br.value, 0.25, 3),
+    ultCd: +M.uc.value,
+    accBolt: +M.ac.value, style: M.st.value, autoUlt: !!M.au.checked
+  };
+  teamCfg[team] = { ...teamCfg[team], ...read };
+  syncScoreboard && syncScoreboard();
+}
+
+
+// ===== Selects com rolagem visível (modo listbox ao abrir) =====
+function enableScrollableSelects(){
+  const ids = ['hHeroA','hHeroB','hHeroC','hHeroD'];
+  ids.forEach(id=>{
+    const s = document.getElementById(id);
+    if(!s) return;
+    s.size = 1; // modo dropdown
+    s.addEventListener('mousedown', ()=>{ s.size = 10; s.classList.add('open'); });
+    s.addEventListener('change',    ()=>{ s.size = 1;  s.classList.remove('open'); });
+    s.addEventListener('blur',      ()=>{ s.size = 1;  s.classList.remove('open'); });
+  });
+}
+// ---------- Preenche selects com TODOS os heróis ----------
+function populateHeroSelects(){
+  const order = ['wanda','fate','magneto','loki','iceman','emma','phoenix'];
+  const fill = (sel, current) => {
+    const keep = current || sel.value;
+    sel.innerHTML = '';
+    for(const k of order){
+      const kit = HERO_KITS[k]; if(!kit) continue;
+      const o = document.createElement('option');
+      o.value = k; o.textContent = kit.label || kit.full || kit.name || k;
+      sel.appendChild(o);
+    }
+    sel.value = (keep && HERO_KITS[keep]) ? keep : (order[0] || '');
+  };
+  fill(U.hHeroA, teamCfg.A.kit);
+  fill(U.hHeroB, teamCfg.B.kit);
+  if(U.hHeroC) fill(U.hHeroC, teamCfg.C?.kit || 'iceman');
+  if(U.hHeroD) fill(U.hHeroD, teamCfg.D?.kit || 'magneto');
+}
+
+// ---------- Bindings IA ----------
+function bindIA(){
+  const setKit = (t)=>{
+    const sel = t==='A'?U.hHeroA: t==='B'?U.hHeroB: t==='C'?U.hHeroC: U.hHeroD;
+    if (sel) sel.addEventListener('input', ()=>applyKitToUI(t, sel.value));
+  };
+  const wire = (t)=>{
+    const ids = t==='A'?['hNameA','hColorA','hHpA','hSpeedA','hBoltSpeedA','hBoltRateA','hUltCdA','accBoltA','hStyleA','autoUltA']
+             : t==='B'?['hNameB','hColorB','hHpB','hSpeedB','hBoltSpeedB','hBoltRateB','hUltCdB','accBoltB','hStyleB','autoUltB']
+             : t==='C'?['hNameC','hColorC','hHpC','hSpeedC','hBoltSpeedC','hBoltRateC','hUltCdC','accBoltC','hStyleC','autoUltC']
+                       :['hNameD','hColorD','hHpD','hSpeedD','hBoltSpeedD','hBoltRateD','hUltCdD','accBoltD','hStyleD','autoUltD'];
+    ids.forEach(id=>{ if(U[id]) U[id].addEventListener('input', ()=>syncCfgFromUI(t)); });
+  };
+  ['A','B','C','D'].forEach(t=>{ setKit(t); wire(t); });
+
+  const toggleIA = ()=> U.iaPanel.classList.toggle('collapsed');
+  U.toggleIA.addEventListener('click', toggleIA);
+  U.closeIA.addEventListener('click', toggleIA);
+  addEventListener('keydown', e=>{
+    const k=(e.key||'').toLowerCase(); if(k==='i' && !e.ctrlKey && !e.metaKey){
+      const t=(document.activeElement&&document.activeElement.tagName)||'';
+      if(!['INPUT','SELECT','TEXTAREA'].includes(t)) toggleIA();
+    }
+  });
+}
+
+// ---------- Presets ----------
+const BUILTINS = {
+  'Padrão':{ },
+  'Duelos longos':{ dmg:0.8, engage:300, speed:1.5, gravity:1400, drag:0.03 },
+  'Caos gravitacional':{ gravity:3600, falloff:1.7, influence:800, drag:0.01, starfield:600 },
+  'Supernovas altas':{ supernovaRate:0.8, gravity:1200, speed:2.2 },
+  'Defensivo':{ engage:280 }
+};
+
+function loadCustomPresets(){ try{ return JSON.parse(localStorage.getItem('cosmo-presets-v3')||'{}'); }catch{ return {}; } }
+function saveCustomPresets(db){ localStorage.setItem('cosmo-presets-v3', JSON.stringify(db)); }
+function refreshPresetSelect(){
+  const custom = loadCustomPresets();
+  U.presetSelect.innerHTML='';
+  const add = (k,grp)=>{ const o=document.createElement('option'); o.value=`${grp}:${k}`; o.textContent=(grp==='B'?'(pré) ':'')+k; U.presetSelect.appendChild(o); };
+  Object.keys(BUILTINS).forEach(k=>add(k,'B'));
+  Object.keys(custom).forEach(k=>add(k,'C'));
+}
+function serializeSettings(){
+  return {
+    // globais
+    speed:+U.speed.value, gravity:+U.gravity.value, falloff:+U.falloff.value, influence:+U.influence.value, drag:+U.drag.value,
+    trailSecs:+U.trailSecs.value, trailW:+U.trailW.value, fade:+U.fade.value, starfield:+U.starfield.value, curve:+U.curve.value,
+    battle:!!U.battle.checked, engage:+U.engage.value, dmg:+U.dmg.value, supernovaRate:+U.supernovaRate.value,
+
+    boltCd:+U.boltCd.value, boltDmg:+U.boltDmg.value, boltSpeed:+U.boltSpeed.value, orbCd:+U.orbCd.value, orbSwirl:+U.orbSwirl.value,
+
+    // 🔵 ULT Magneto (alvos)
+    magUltG:+U.magUltG.value, magUltR:+U.magUltR.value,
+
+    sndOn:!!U.sndOn.checked, sndVol:+U.sndVol.value,
+    mBolt:!!U.mBolt.checked, mOrb:!!U.mOrb.checked, mWave:!!U.mWave.checked, mShield:!!U.mShield.checked,
+    // por-herói
+    A:{...teamCfg.A}, B:{...teamCfg.B}
+  };
+}
+function applySettings(obj){
+  const set=(el,v)=>{ if(el==null||v===undefined) return; if(el.type==='checkbox') el.checked=!!v; else el.value=v; };
+  ['speed','gravity','falloff','influence','drag','trailSecs','trailW','fade','starfield','curve',
+   'engage','dmg','supernovaRate','boltCd','boltDmg','boltSpeed','orbCd','orbSwirl',
+   'magUltG','magUltR','sndVol']
+   .forEach(k=> set(U[k], obj[k]));
+  ['battle','mBolt','mOrb','mWave','mShield','sndOn'].forEach(k=> set(U[k], obj[k]));
+  if(obj.A){ teamCfg.A = {...teamCfg.A, ...obj.A}; syncUIFromCfg('A'); }
+  if(obj.B){ teamCfg.B = {...teamCfg.B, ...obj.B}; syncUIFromCfg('B'); }
+  refreshPresetSelect();
+
+enableScrollableSelects();
+setGameMode((U.gameMode && U.gameMode.value)||'2v2');
+}
+U.presetApply.addEventListener('click', ()=>{
+  const v=U.presetSelect.value||''; const [grp,name]=v.split(':'); const custom=loadCustomPresets();
+  const src = grp==='C' ? custom[name] : BUILTINS[name]; if(src) applySettings(src);
+});
+U.presetSave.addEventListener('click', ()=>{
+  const name=(U.presetName.value||'Preset').trim(); if(!name) return;
+  const custom=loadCustomPresets(); custom[name]=serializeSettings(); saveCustomPresets(custom); refreshPresetSelect();
+
+enableScrollableSelects(); U.presetName.value='';
+});
+U.presetDelete.addEventListener('click', ()=>{
+  const v=U.presetSelect.value||''; const [grp,name]=v.split(':'); if(grp!=='C') return;
+  const custom=loadCustomPresets(); delete custom[name]; saveCustomPresets(custom); refreshPresetSelect();
+
+enableScrollableSelects();
+});
+
+// ---------- Exporta para o motor (Parte 2) ----------
+window.__COSMO_CFG__ = {
+  U, HERO_KITS, teamCfg, NITRO, THINK,
+  hexToRgba, clamp,
+  applyKitToUI, syncUIFromCfg, syncCfgFromUI, syncScoreboard,
+  refreshPresetSelect
+};
+// ======= ESTADO DE ROUND / VIDA POR SLOT (A,B,C,D) — 2×2 =======
+window.__COSMO_ROUND__ = (function(){
+  const U = (window.__COSMO_CFG__||{}).U || {};
+  const teamL = ['A','C'];  // time esquerdo (Pink)
+  const teamR = ['B','D'];  // time direito (Yellow)
+  const alive = { A:true, B:true, C:true, D:true };
+  let scoreL = 0, scoreR = 0;
+  function setScore(l, r){
+    scoreL = Math.max(0, l|0); scoreR = Math.max(0, r|0);
+    if (U.scorePinkEl)   U.scorePinkEl.textContent   = String(scoreL);
+    if (U.scoreYellowEl) U.scoreYellowEl.textContent = String(scoreR);
+    if (typeof syncScoreboard==='function') syncScoreboard();
+  }
+  function addPoint(side){ if(side==='L') setScore(scoreL+1, scoreR); else setScore(scoreL, scoreR+1); }
+  function markAlive(id, v){ alive[id] = !!v; }
+  function teamWiped(sideList){ return sideList.every(id => alive[id]===false); }
+  function resetLivesForMode(mode){
+    const use = (mode==='2v2') ? ['A','B','C','D'] : ['A','B'];
+    ['A','B','C','D'].forEach(id => alive[id] = use.includes(id));
+  }
+  return { teamL, teamR, alive, setScore, addPoint, markAlive, teamWiped, resetLivesForMode };
+})();
+
+
+// Inicialização
+populateHeroSelects();
+bindIA();
+applyKitToUI('A', teamCfg.A.kit);
+applyKitToUI('B', teamCfg.B.kit);
+refreshPresetSelect();
+
+enableScrollableSelects();
+
+applyKitToUI && teamCfg.C && U.hHeroC && applyKitToUI('C', teamCfg.C.kit);
+applyKitToUI && teamCfg.D && U.hHeroD && applyKitToUI('D', teamCfg.D.kit);
+})(); // fim Parte 1/4
+// ========= KILL/RESPAWN GENÉRICO (A,B,C,D) & FIM DE ROUND =========
+var Round = window.__COSMO_ROUND__;
+
+function respawnPlayer(id, opts){
+  const cfg = (id==='A')?teamCfg.A : (id==='B')?teamCfg.B : (id==='C')?teamCfg.C : teamCfg.D;
+  if(!cfg) return;
+  if (window.__COSMO_CORE__ && typeof window.__COSMO_CORE__.spawnHero === 'function'){
+    window.__COSMO_CORE__.spawnHero(id, cfg, opts||{});
+  } else if (typeof window.spawnHero === 'function'){
+    window.spawnHero(id, cfg, opts||{});
+  }
+  Round.markAlive(id, true);
+}
+function heroDied(id){
+  Round.markAlive(id, false);
+  const mode = (U.gameMode && U.gameMode.value) || '2v2';
+  if(mode==='1v1'){
+    const winner = (id==='A') ? 'R' : 'L';
+    Round.addPoint(winner);
+    setTimeout(()=>{ respawnPlayer('A'); respawnPlayer('B'); }, 900);
+    return;
+  }
+  if (Round.teamWiped(Round.teamL)){
+    Round.addPoint('R');
+    setTimeout(()=>{ ['A','B','C','D'].forEach(pid=>respawnPlayer(pid)); }, 1100);
+    return;
+  }
+  if (Round.teamWiped(Round.teamR)){
+    Round.addPoint('L');
+    setTimeout(()=>{ ['A','B','C','D'].forEach(pid=>respawnPlayer(pid)); }, 1100);
+    return;
+  }
+  setTimeout(()=>{ respawnPlayer(id); }, 1400);
+}
+</script>
+<script>
+/* =========================================================
+   COSMOS — Motor de jogo (Parte 2/4)
+   (engine: canvas, câmera, estrelas, starfield, áudio, UI)
+   ========================================================= */
+(() => {
+  const CFG = window.__COSMO_CFG__ || {};
+const {U, HERO_KITS, teamCfg, NITRO, THINK,
+    hexToRgba, clamp, applyKitToUI, syncUIFromCfg, syncCfgFromUI, syncScoreboard, refreshPresetSelect
+  } = CFG;
+
+  // Canvas & câmera
+  const canvas = document.getElementById('cosmos');
+  const ctx     = canvas.getContext('2d');
+
+  let DPR = Math.max(1, Math.min(2, window.devicePixelRatio||1));
+  let CW=0, CH=0;
+
+  function resize(){
+    CW = innerWidth; CH = innerHeight;
+    canvas.style.width = CW+'px'; canvas.style.height = CH+'px';
+    canvas.width  = Math.floor(CW*DPR);
+    canvas.height = Math.floor(CH*DPR);
+  }
+  resize();
+  addEventListener('resize', ()=>{ DPR=Math.max(1,Math.min(2,devicePixelRatio||1)); resize(); if (U && U.starfield) if(U && U.starfield) makeStarfield(+U.starfield.value); });
+
+  const camera = { x:0, y:0, scale:1, min:0.3, max:3 };
+  let worldScaleFactor = 1, WW=CW*1.0, WH=CH*1.0;
+
+  function centerCamera(){ camera.x=WW/2; camera.y=WH/2; }
+  function screenToWorld(sx,sy){ const wx=(sx-CW/2)/camera.scale+camera.x; const wy=(sy-CH/2)/camera.scale+camera.y; return {x:wx,y:wy}; }
+  function setZoomAt(target,sx,sy){
+    const pre=screenToWorld(sx,sy);
+    camera.scale = clamp(target,camera.min,camera.max);
+    const post=screenToWorld(sx,sy);
+    camera.x += pre.x-post.x; camera.y += pre.y-post.y;
+    U.zoom.value = camera.scale.toFixed(2); updateBadges();
+  }
+  function zoomBy(f,sx,sy){ setZoomAt(camera.scale*f,sx,sy); }
+  function updateBadges(){
+    U.zoomBadge.textContent = Math.round(camera.scale*100)+'%';
+    U.uniBadge.textContent  = `Universo ${worldScaleFactor}\u00D7`;
+  }
+  function withCamera(fn){ ctx.save(); ctx.translate(CW/2,CH/2); ctx.scale(camera.scale,camera.scale); ctx.translate(-camera.x,-camera.y); fn(); ctx.restore(); }
+  function fillCircle(x,y,r,rgba){ ctx.beginPath(); ctx.arc(x,y,Math.max(0,r+0.01),0,Math.PI*2-1e-4); ctx.fillStyle=rgba; ctx.fill(); }
+  function strokeHalo(x,y,r,w,rgba){ ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2-1e-4); ctx.lineWidth=w; ctx.strokeStyle=rgba; ctx.stroke(); }
+  const len2=(x,y)=>Math.hypot(x,y);
+  const unit=a=>({x:Math.cos(a),y:Math.sin(a)});
+  const randAngle = ()=> Math.random()*Math.PI*2;
+
+  // Pan/zoom
+  let panning=false, movingStar=false, panStart={sx:0,sy:0,cx:0,cy:0};
+  const keys={shift:false, space:false};
+  addEventListener('keydown',e=>{
+    const k=(e.key||'').toLowerCase();
+    if(k==='shift') keys.shift=true;
+    if(k===' ') keys.space=true;
+    if(k==='1') dispatchEvent(new CustomEvent('cosmo:ultA'));
+    if(k==='2') dispatchEvent(new CustomEvent('cosmo:ultB'));
+  });
+  addEventListener('keyup',e=>{
+    const k=(e.key||'').toLowerCase();
+    if(k==='shift') keys.shift=false;
+    if(k===' ') keys.space=false;
+  });
+
+  canvas.addEventListener('contextmenu',e=>e.preventDefault());
+  canvas.addEventListener('pointerdown',e=>{
+    const sx=e.clientX, sy=e.clientY;
+    const {x,y} = screenToWorld(sx,sy);
+    if(e.ctrlKey){ addStar(x,y); return; }
+    if(e.altKey){ movingStar=true; moveNearestStarTo(x,y); return; }
+    if(e.button===1||e.button===2||keys.space){ panning=true; panStart={sx,sy,cx:camera.x,cy:camera.y}; canvas.setPointerCapture && canvas.setPointerCapture(e.pointerId); return; }
+  });
+  canvas.addEventListener('pointermove',e=>{
+    const sx=e.clientX, sy=e.clientY;
+    const {x,y} = screenToWorld(sx,sy);
+    if(movingStar) moveNearestStarTo(x,y);
+    if(panning){ const dx=(sx-panStart.sx)/camera.scale, dy=(sy-panStart.sy)/camera.scale; camera.x=panStart.cx-dx; camera.y=panStart.cy-dy; }
+  });
+  addEventListener('pointerup',e=>{ movingStar=false; if(panning){ panning=false; canvas.releasePointerCapture && canvas.releasePointerCapture(e.pointerId); }});
+  canvas.addEventListener('wheel',e=>{ e.preventDefault(); const f=Math.pow(1.1,-e.deltaY/100); zoomBy(f,e.clientX,e.clientY); },{passive:false});
+  canvas.addEventListener('dblclick',()=>{ camera.scale=1; centerCamera(); U.zoom.value=camera.scale; updateBadges(); });
+
+  // Universo
+  const STAR_TYPES={
+    sun:{massScale:1,color:'#fff4b2',halo:'rgba(255,231,147,1)',spinSpeed:0.005},
+    white_dwarf:{massScale:3,color:'#e8f3ff',halo:'rgba(207,230,255,1)',spinSpeed:0.008},
+    neutron:{massScale:6,color:'#a8d8ff',halo:'rgba(126,194,255,1)',spinSpeed:0.05},
+    pulsar:{massScale:8,color:'#c3e6ff',halo:'rgba(157,211,255,1)',spinSpeed:0.12},
+    magnetar:{massScale:10,color:'#b9fff4',halo:'rgba(116,255,233,1)',spinSpeed:0.06},
+    supergiant:{massScale:12,color:'#ffd1a3',halo:'rgba(255,178,122,1)',spinSpeed:0.004},
+    black_hole:{massScale:20,color:'#000000',halo:'rgba(154,169,255,1)',spinSpeed:0.01}
+  };
+  const stars=[];
+
+  function addStar(x,y,type=U.starType.value,r=+U.starSize.value){
+    const st=STAR_TYPES[type]||STAR_TYPES.sun;
+    stars.push({x,y,r,type,massScale:st.massScale,spin:0,spinSpeed:st.spinSpeed,gammaT:0,gammaPol:false});
+    updateStarCount();
+  }
+  function removeStar(){ stars.pop(); updateStarCount(); }
+  function clearStars(){ stars.length=0; updateStarCount(); }
+  function updateStarCount(){ U.starCount.textContent=`${stars.length} ${stars.length===1?'estrela':'estrelas'}`; }
+  function moveNearestStarTo(x,y){
+    if(!stars.length) return;
+    let best=0,bd=Infinity; for(let i=0;i<stars.length;i++){ const s=stars[i]; const d=(s.x-x)**2+(s.y-y)**2; if(d<bd){ bd=d; best=i; } }
+    stars[best].x=x; stars[best].y=y;
+  }
+
+  // Starfield
+  let bgStars=[];
+  function makeStarfield(val){
+    const baseN=Math.floor(val);
+    const areaFactor=Math.max(1,Math.round((WW*WH)/(CW*CH)));
+    const N=Math.min(20000,baseN*areaFactor);
+    bgStars=Array.from({length:N},()=>({x:Math.random()*WW,y:Math.random()*WH,s:Math.random()*1.5+0.2,a:Math.random()*0.8+0.2}));
+  }
+
+  // ⚠️ TINT REMOVIDO — mantido apenas stub para compatibilidade
+  function activateTint(){ /* no-op */ }
+
+  function drawBackground(){
+    ctx.fillStyle=`rgba(0,0,0,${+U.fade.value})`;
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    ctx.fillRect(0,0,CW,CH);
+    // (sem overlay de tint)
+  }
+
+  function drawStarfield(){
+    const vw=CW/camera.scale, vh=CH/camera.scale;
+    const x0=camera.x-vw/2-10, x1=camera.x+vw/2+10;
+    const y0=camera.y-vh/2-10, y1=camera.y+vh/2+10;
+    withCamera(()=>{ 
+      for(const s of bgStars){
+        if(s.x<x0||s.x>x1||s.y<y0||s.y>y1) continue; 
+        ctx.globalAlpha=s.a; ctx.fillStyle='#fff'; ctx.fillRect(s.x,s.y,s.s,s.s); 
+      } 
+      ctx.globalAlpha=1; 
+    });
+  }
+
+  function drawBeamsLocal(star,r){
+    const type=star.type; const beamsN=(type==='pulsar')?2:4; const baseAlpha=(type==='magnetar')?0.22:0.35;
+    for(let i=0;i<beamsN;i++){
+      const ang=star.spin+(i*(Math.PI*2/beamsN)); const len=r*5,w=r*0.45;
+      ctx.save(); ctx.translate(star.x,star.y); ctx.rotate(ang);
+      const grad=ctx.createLinearGradient(0,0,len,0);
+      const c1=(type==='magnetar')?'rgba(180,255,240,0)':'rgba(255,255,255,0)';
+      const c2=(type==='magnetar')?'rgba(180,255,240,1)':'rgba(220,240,255,1)';
+      grad.addColorStop(0.0,c1); grad.addColorStop(0.2,`rgba(255,255,255,${baseAlpha})`); grad.addColorStop(1.0,c2);
+      ctx.fillStyle=grad; ctx.beginPath(); ctx.moveTo(0,-w/2); ctx.lineTo(len,-w/2); ctx.lineTo(len,w/2); ctx.lineTo(0,w/2); ctx.closePath(); ctx.fill(); ctx.restore();
+    }
+    if(type==='magnetar'){ const puls=1+Math.sin(star.spin*2)*0.08; strokeHalo(star.x,star.y,r*1.8*puls,1.5,'rgba(116,255,233,0.5)'); }
+  }
+  function drawAccretionDiskLocal(s,r){
+    const R1=r*1.2,R2=r*3.5; ctx.save(); ctx.translate(s.x,s.y); ctx.rotate(s.spin*0.7);
+    const grad=ctx.createRadialGradient(0,0,R1,0,0,R2);
+    grad.addColorStop(0,'rgba(255,240,200,0.15)'); grad.addColorStop(0.5,'rgba(220,200,255,0.25)'); grad.addColorStop(1,'rgba(120,140,255,0.0)');
+    ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(0,0,R2,0,Math.PI*2-1e-4); ctx.arc(0,0,R1,0,Math.PI*2-1e-4,true); ctx.fill(); ctx.restore();
+  }
+  function drawStar(s){
+    const st=STAR_TYPES[s.type], r=s.r;
+    withCamera(()=>{
+      const grd=ctx.createRadialGradient(s.x,s.y,0,s.x,s.y,r*4);
+      grd.addColorStop(0,st.halo.replace('1)','0.9)')); grd.addColorStop(0.3,st.halo.replace('1)','0.45)')); grd.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(s.x,s.y,r*4,0,Math.PI*2-1e-4); ctx.fill();
+      s.spin+=st.spinSpeed;
+      if(s.type==='pulsar'||s.type==='neutron'||s.type==='magnetar') drawBeamsLocal(s,r);
+      if(s.type==='black_hole'){ drawAccretionDiskLocal(s,r); fillCircle(s.x,s.y,r*0.9,'#000'); }
+      else { ctx.shadowBlur=60; ctx.shadowColor=st.color; fillCircle(s.x,s.y,r,st.color); ctx.shadowBlur=0; }
+    });
+  }
+
+  // Sons
+  const SND = (function(){
+    const C = window.AudioContext || window.webkitAudioContext;
+    var a, master, enabled = true;
+    try {
+      if(!C) throw 0;
+      a = new C();
+      master = a.createGain();
+      master.gain.value = .35;
+      master.connect(a.destination);
+    } catch (e) {
+      return {
+        boom: function(){}, hit: function(){}, zap: function(){}, orb: function(){},
+        wave: function(){}, shield: function(){}, supernova: function(){}, gamma: function(){},
+        setEnabled: function(){}, setVol: function(){}, unlock: function(){}
+      };
+    }
+
+    function unlock(){ if(a.state==='suspended') a.resume(); }
+    function setEnabled(v){ enabled = !!v; }
+    function setVol(v){ master.gain.value = Math.max(0, Math.min(1, +v||0)); }
+    function tone(opts){
+      opts = opts || {};
+      var freq=opts.freq||440, dur=opts.dur||.12, type=opts.type||'sine', vol=opts.vol||.4;
+      var attack=opts.attack||.005, release=opts.release||.08, glideTo=opts.glideTo||null;
+      if(!enabled) return;
+      var now=a.currentTime, osc=a.createOscillator(), g=a.createGain();
+      osc.type=type; osc.frequency.setValueAtTime(freq, now);
+      if(glideTo){ osc.frequency.exponentialRampToValueAtTime(Math.max(30,glideTo), now+dur); }
+      g.gain.setValueAtTime(.0001, now);
+      g.gain.linearRampToValueAtTime(vol, now+attack);
+      g.gain.exponentialRampToValueAtTime(.0001, now+Math.max(attack, dur-release));
+      osc.connect(g); g.connect(master); osc.start(now); osc.stop(now+dur+.02);
+    }
+    function noise(opts){
+      opts = opts || {};
+      var dur=opts.dur||.35, vol=opts.vol||.4;
+      if(!enabled) return;
+      var len=Math.floor(a.sampleRate*dur), buf=a.createBuffer(1,len,a.sampleRate), data=buf.getChannelData(0);
+      for(var i=0;i<len;i++) data[i]=Math.random()*2-1;
+      var src=a.createBufferSource(); src.buffer=buf; var g=a.createGain(); g.gain.value=vol; src.connect(g); g.connect(master);
+      var now=a.currentTime; g.gain.setValueAtTime(vol,now); g.gain.exponentialRampToValueAtTime(.0001,now+dur); src.start(now); src.stop(now+dur+.05);
+    }
+    var boom=function(){ noise({dur:.5,vol:.35}); tone({freq:90,dur:.45,type:'sine',vol:.22,glideTo:60}); };
+    var hit =function(){ tone({freq:340,dur:.08,type:'square',vol:.18,glideTo:220}); };
+    var zap =function(){ tone({freq:1200,dur:.18,type:'sawtooth',vol:.15,glideTo:500}); };
+    var orb =function(){ tone({freq:600,dur:.06,type:'triangle',vol:.12}); };
+    var wave=function(){ tone({freq:180,dur:.22,type:'sine',vol:.18}); };
+    var shield=function(){ tone({freq:520,dur:.30,type:'triangle',vol:.14}); };
+    var supernova=function(){ boom(); setTimeout(boom,120); };
+    var gamma=function(){ tone({freq:2100,dur:.06,type:'sawtooth',vol:.18}); };
+  if (U && U.sndOn) (U && U.sndOn) && U.sndOn.addEventListener('input',function(){ setEnabled(U.sndOn.checked); });
+  if (U && U.sndVol) (U && U.sndVol) && U.sndVol.addEventListener('input',function(){ setVol(+U.sndVol.value); });
+    addEventListener('pointerdown',unlock,{once:true}); addEventListener('keydown',unlock,{once:true});
+    setVol(+U.sndVol?.value||0.35);
+
+    return { boom:boom, hit:hit, zap:zap, orb:orb, wave:wave, shield:shield, supernova:supernova, gamma:gamma,
+             setEnabled:setEnabled, setVol:setVol, unlock:unlock };
+  })();
+
+  // UI
+  const panelEl=document.getElementById('panel');
+  const uiToggleBtn=document.getElementById('uiToggle');
+  let uiCollapsed=false;
+  function setUICollapsed(b){ uiCollapsed=b; panelEl.classList.toggle('collapsed',b); uiToggleBtn.style.display=b?'inline-block':'none'; }
+  U.toggleUI.onclick=()=>setUICollapsed(!uiCollapsed);
+  uiToggleBtn.onclick=()=>setUICollapsed(false);
+  addEventListener('keydown',e=>{
+    const k=(e.key||'').toLowerCase();
+    if((k==='u'||k==='h')&&!e.ctrlKey&&!e.metaKey){
+      const t=(document.activeElement&&document.activeElement.tagName)||'';
+      if(['INPUT','SELECT','TEXTAREA'].includes(t)) return; setUICollapsed(!uiCollapsed);
+    }
+  });
+
+  // Botões universo
+  U.addStar.onclick = ()=> addStar(camera.x+(Math.random()-.5)*CW, camera.y+(Math.random()-.5)*CH);
+  U.removeStar.onclick = removeStar;
+  U.clearStars.onclick = clearStars;
+  U.recenter.onclick=()=>{ if(stars.length===0) return; const cx=stars.reduce((a,s)=>a+s.x,0)/stars.length; const cy=stars.reduce((a,s)=>a+s.y,0)/stars.length; const dx=WW/2-cx,dy=WH/2-cy; for(const s of stars){ s.x+=dx; s.y+=dy; } };
+  U.fullscreen.onclick=()=>{ if(!document.fullscreenElement){ (document.documentElement.requestFullscreen||document.body.requestFullscreen).call(document.documentElement||document.body); } else { document.exitFullscreen&&document.exitFullscreen(); } };
+  U.resetView.onclick=()=>{ camera.scale=1; centerCamera(); U.zoom.value=camera.scale; updateBadges(); };
+  U.zoom.addEventListener('input',()=>setZoomAt(+U.zoom.value,CW/2,CH/2));
+  U.gameMode && U.gameMode.addEventListener('input', ()=>{
+    const mode=U.gameMode.value;
+    (window.setGameMode||setGameMode)?.(mode);
+    if(window.__COSMO_CORE__ && typeof window.__COSMO_CORE__.resetUniverseForMode==='function'){
+      window.__COSMO_CORE__.resetUniverseForMode(mode);
+    }
+  });
+  U.expandU.onclick=()=>{ worldScaleFactor += 0.25; const cx=camera.x,cy=camera.y; const oldWW=WW,oldWH=WH; WW=CW*worldScaleFactor; WH=CH*worldScaleFactor; camera.x=cx+(WW-oldWW)/2; camera.y=cy+(WH-oldWH)/2; if (U && U.starfield) if(U && U.starfield) makeStarfield(+U.starfield.value); updateBadges(); };
+
+  // ULT buttons -> eventos
+  U.ultA.onclick=()=>dispatchEvent(new CustomEvent('cosmo:ultA'));
+  U.ultB.onclick=()=>dispatchEvent(new CustomEvent('cosmo:ultB'));
+
+  // Inicialização de estrelas
+  function initWorld(){
+    WW=CW*worldScaleFactor; WH=CH*worldScaleFactor;
+    clearStars();
+    const margin = Math.min(WW,WH)*0.15;
+    for(const d of defs){
+      let x = margin + Math.random()*(WW-2*margin);
+      let y = margin + Math.random()*(WH-2*margin);
+      addStar(x,y,d.type,d.r);
+    }
+    centerCamera(); if (U && U.starfield) if(U && U.starfield) makeStarfield(+U.starfield.value); updateBadges(); syncScoreboard();
+  }
+    const defs = [
+      {type:'magnetar',     r:42},
+      {type:'neutron',      r:26},
+      {type:'pulsar',       r:34},
+      {type:'black_hole',   r:30},
+      {type:'sun',          r:28}
+    ];
+  initWorld();
+
+  // Exposição para Parte 3/4 e 4/4
+  window.__COSMO_CORE__ = {
+    canvas, ctx, DPR:()=>DPR, CW:()=>CW, CH:()=>CH, camera,
+    withCamera, fillCircle, strokeHalo, unit, len2, randAngle,
+
+    stars, STAR_TYPES, addStar, removeStar, clearStars, makeStarfield, drawStar, drawStarfield, drawBackground,
+
+    SND, activateTint,  // <- stub (no-op)
+
+    WW: () => WW,
+    WH: () => WH,
+
+    updateBadges
+  , resetUniverseForMode: resetUniverseForMode};
+
+  // Reset do universo conforme modo (1x1 ou 2x2)
+  function resetUniverseForMode(mode){
+    mode = mode || (U.gameMode && U.gameMode.value) || '1v1';
+    const target = (mode==='2v2') ? 1.25 : 1.0;
+    if (Math.abs(worldScaleFactor - target) > 1e-6){
+      worldScaleFactor = target;
+      WW = CW * worldScaleFactor; WH = CH * worldScaleFactor;
+      centerCamera();
+      if (U && U.starfield) if(U && U.starfield) makeStarfield(+U.starfield.value);
+      updateBadges();
+    }
+    clearStars();
+    if (mode === '2v2'){
+      const R_MAX = 80;
+      addStar(WW*0.35, WH*0.45, 'supergiant', R_MAX);
+      addStar(WW*0.65, WH*0.55, 'white_dwarf', R_MAX);
+    } else {
+      initWorld();
+      return;
+    }
+    updateBadges(); syncScoreboard && syncScoreboard();
+  }
+})(); // fim Parte 2/4
+// ========= KILL/RESPAWN GENÉRICO (A,B,C,D) & FIM DE ROUND =========
+function heroDied(id){
+  Round.markAlive(id, false);
+  const mode = (U.gameMode && U.gameMode.value) || '2v2';
+  if(mode==='1v1'){
+    const winner = (id==='A') ? 'R' : 'L';
+    Round.addPoint(winner);
+    setTimeout(()=>{ respawnPlayer('A'); respawnPlayer('B'); }, 900);
+    return;
+  }
+  if (Round.teamWiped(Round.teamL)){
+    Round.addPoint('R');
+    setTimeout(()=>{ ['A','B','C','D'].forEach(pid=>respawnPlayer(pid)); }, 1100);
+    return;
+  }
+  if (Round.teamWiped(Round.teamR)){
+    Round.addPoint('L');
+    setTimeout(()=>{ ['A','B','C','D'].forEach(pid=>respawnPlayer(pid)); }, 1100);
+    return;
+  }
+  setTimeout(()=>{ respawnPlayer(id); }, 1400);
+}
+</script>
+<script>
+/* =========================================================
+   COSMOS — Heróis, Combate, IA e Loop (Parte 3/4)
+   Atualizações nesta parte:
+   • NOVA HEROÍNA: Phoenix (Jean Grey)
+       - Passiva: Onda Telecinética a cada 5s (para projéteis, dano em inimigos, regeneração)
+       - ULT: invulnerável 5s, rouba/atrai projéteis, explode no fim
+       - Renascimento especial: renasce em 0.8s com 50% HP se morrer sobre uma estrela
+   • Per-herói: Taxa de Ataque de Bolts (boltRateMul) — o CD de bolt é
+     dividido por este multiplicador (ligação de UI na Parte 1/5).
+   ========================================================= */
+(() => {
+  const CFG = window.__COSMO_CFG__ || {};
+const {U, HERO_KITS, teamCfg, NITRO, THINK,
+    hexToRgba, clamp
+  } = CFG;
+
+  const CORE = window.__COSMO_CORE__;
+  if (!CORE) { console.error('[Parte 3/4] __COSMO_CORE__ ausente.'); return; }
+
+  const {
+    canvas, ctx, DPR, CW, CH, camera,
+    withCamera, fillCircle, strokeHalo, unit, len2, randAngle,
+    stars, STAR_TYPES, addStar, removeStar, clearStars, makeStarfield, drawStar, drawStarfield, drawBackground,
+    SND, WW:WW_get, WH:WH_get, updateBadges
+  } = CORE;
+
+  // ===================== NOVA HEROÍNA: PHOENIX =====================
+  // Registra kit (caso ainda não exista no bloco da Parte 1/5)
+  if (!HERO_KITS.phoenix) {
+    HERO_KITS.phoenix = {
+      key:'phoenix', name:'Fênix', full:'Jean Grey', label:'Jean Grey (Fênix)', base:'#ff6d00',
+      hp:170, speedMul:1.16, boltMul:1.18, ultCd:22, accBolt:0.86, think:THINK, ultName:'Fogo da Fênix'
+    };
+  }
+  // Garante que apareça nos selects (fallback – UI completa na Parte 1/5)
+  const ensurePhoenixInSelect = (sel) => {
+    if (!sel) return;
+    if ([...sel.options].some(o => o.value==='phoenix')) return;
+    const o=document.createElement('option');
+    o.value='phoenix'; o.textContent=HERO_KITS.phoenix.label;
+    sel.appendChild(o);
+  };
+  ensurePhoenixInSelect(U.hHeroA);
+  ensurePhoenixInSelect(U.hHeroB);
+  // ===================================================================
+
+  // 🔥 FÊNIX — verifica se o herói está sobre qualquer astro
+  function isOnAnyStar(h){
+    for(const s of stars){
+      const d = Math.hypot(h.x - s.x, h.y - s.y);
+      if(d <= s.r + h.r*0.6) return s; // Retorna a estrela
+    }
+    return null;
+  }
+  
+  function nearestStarAt(x, y){
+    let best=null, bd=Infinity;
+    for(const s of stars){ const d=(s.x-x)**2+(s.y-y)**2; if(d<bd){ bd=d; best=s; } }
+    return best;
+  }
+
+  // Estado
+  const projectiles = []; // orbes (férteis à gravidade)
+  const bolts       = []; // raios (reta rápida)
+  const waves       = []; // pulsos circulares
+  const effects     = []; // efeitos visuais
+  const gBeams      = []; // (REMOVIDO: não usado)
+  const iceZones    = []; // 🧊 zonas de gelo (da ULT do Ice Man)
+  const timeSands   = [];
+  const fateGlyphs  = [];
+
+  // ------------------ ULT VISUAL/ALVOS MAGNETO ------------------
+  const magUlts = []; // { caster, t0, until }
+  function addMagnetoField(caster, ms){
+    const now = performance.now();
+    magUlts.push({ caster, t0: now, until: now + (ms||1100) });
+  }
+  function purgeMagUlts(now){ for(let i=magUlts.length-1;i>=0;i--) if(now>=magUlts[i].until) magUlts.splice(i,1); }
+  function isMagUlting(h){ const now=performance.now(); for(const m of magUlts){ if(m.caster===h && now<m.until) return true; } return false; }
+  function removeMagnetoFieldsOf(hero){ for(let i=magUlts.length-1;i>=0;i--) if(magUlts[i].caster===hero) magUlts.splice(i,1); }
+
+  // ------------------ LOKI: ILUSÕES/CLONES ------------------
+  const illusions = []; // { caster, id, x,y, r, hex, color, accBolt, boltMul, cd:{bolt}, until, orbitR, orbitA }
+  function spawnLokiClones(caster, secs=3.0){
+    const now = performance.now();
+    const green = '#00c853';
+    const base = {
+      caster,
+      id: caster.id,
+      r: caster.r,
+      accBolt: caster.accBolt*0.98,
+      boltMul: caster.boltMul*1.00,
+      cd: { bolt: Math.random()*0.2 }
+    };
+    const R = 26;
+    for(let i=0;i<2;i++){
+      illusions.push({
+        ...base,
+        x: caster.x, y: caster.y,
+        hex: green, color: hexToRgba(green, 0.90),
+        until: now + secs*1000,
+        orbitR: R,
+        orbitA: i===0 ? 0 : Math.PI
+      });
+    }
+  }
+  function cancelIllusionsOf(hero, fx=true){
+    for(let i=illusions.length-1;i>=0;i--){
+      if(illusions[i].caster===hero){
+        if(fx) effects.push({type:'hit',x:illusions[i].x,y:illusions[i].y,t:0,dur:0.35,color:hexToRgba(illusions[i].hex,0.95)});
+        illusions.splice(i,1);
+      }
+    }
+  }
+  function updateIllusions(dt){
+    const now=performance.now();
+    for(let i=illusions.length-1;i>=0;i--){
+      const il = illusions[i];
+      const host = il.caster;
+      if(now>=il.until || !host || !host.alive){
+        effects.push({type:'hit',x:il.x,y:il.y,t:0,dur:0.35,color:hexToRgba(il.hex,0.95)});
+        illusions.splice(i,1);
+        continue;
+      }
+      il.orbitA += dt*3.2;
+      il.x = host.x + Math.cos(il.orbitA)*il.orbitR;
+      il.y = host.y + Math.sin(il.orbitA)*il.orbitR;
+
+      il.cd.bolt = Math.max(0, il.cd.bolt - dt);
+      const foe = nearestEnemyOf(host);
+      if(foe && il.cd.bolt<=0){
+        castBoltTravel(il, foe);
+        il.cd.bolt = Math.max(0.2, (+U.boltCd.value||2.0)*0.55);
+      }
+    }
+  }
+  function drawIllusions(){
+    withCamera(()=>{
+      for(const il of illusions){
+        ctx.beginPath(); ctx.arc(il.x, il.y, il.r, 0, Math.PI*2-1e-4);
+        ctx.fillStyle = il.color; ctx.shadowBlur=18; ctx.shadowColor=il.color; ctx.globalAlpha=0.85;
+        ctx.fill(); ctx.shadowBlur=0; ctx.globalAlpha=1;
+        const a = 0.35 + 0.25*Math.sin(performance.now()/160 + il.orbitA);
+        strokeHalo(il.x, il.y, il.r+10, 1.8, hexToRgba(il.hex, a));
+      }
+    });
+  }
+
+  const scores = { A:0, B:0 };
+  function updateScores(){
+    U.scorePinkEl.textContent = scores.A;
+    U.scoreYellowEl.textContent = scores.B;
+    U.scoreA.textContent = ${teamCfg.A.name} ${scores.A}`;
+    U.scoreB.textContent = `${scores.B} ${teamCfg.B.name}`;
+  }
+
+  // Vida / spawn
+  const SPAWN_GRACE = 3.5;
+  const SAFE_BORDER = 64;
+  const SAFE_FROM_STAR = 140;
+
+  function spawnExplosion(x,y,color=null){ effects.push({type:'boom',x,y,t:0,dur:0.6,color}); SND.boom(); }
+  function spawnHit(x,y,color){ effects.push({type:'hit',x,y,t:0,dur:0.25,color}); SND.hit(); }
+
+  // ⚠️ Estados de proteção
+  function isEmmaDiamond(h){
+    if(h.kit!=='emma') return false;
+    const now=performance.now();
+    return now < (h._efUntil||0);
+  }
+  function isInvulnerable(h){
+    return (h.grace>0) || (h.ankh>0) || (h.wInvul>0) || isEmmaDiamond(h);
+  }
+  function barrierActive(h){
+    // Ice Man só conta se a passiva não estiver em cooldown
+    const iceReady = (h.kit==='iceman' && (h.iceLayers||0)>0 && (h.iceCd||0)<=0);
+    return (h.ankh>0) || (h.shield>0) || (h.wInvul>0) || iceReady || isEmmaDiamond(h);
+  }
+  function barrierRadius(h){
+    if(h.wInvul>0) return h.r + 22; // Wanda invul
+    if(h.ankh>0)   return h.r + 22; // Fate ankh
+    if(isEmmaDiamond(h)) return h.r + 16; // Emma diamante
+    if(h.shield>0) return h.r + 10; // padrão
+    if(h.kit==='iceman' && (h.iceLayers||0)>0 && (h.iceCd||0)<=0)
+      return h.r + 12 + Math.max(0, Math.min(2, (h.iceLayers-1)))*6; // 1..3 anéis (raio cresce por anel extra)
+    return h.r + 6;
+  }
+
+  function findSafeSpawn(){
+    const WW = WW_get(), WH = WH_get();
+    for(let tries=0; tries<50; tries++){
+      const x = SAFE_BORDER + Math.random()*(WW - SAFE_BORDER*2);
+      const y = SAFE_BORDER + Math.random()*(WH - SAFE_BORDER*2);
+      let ok = true;
+      for(const s of stars){ const d=Math.hypot(x-s.x,y-s.y); if(d < (s.r + SAFE_FROM_STAR)) { ok=false; break; } }
+      if(ok) return {x,y};
+    }
+    return {x:WW*0.5, y:WH*0.5};
+  }
+
+  // Status helpers
+  function applySlow(target, intensity=0.9, secs=1.0){
+    const now = performance.now();
+    target.slowMul = Math.max(0.01, 1 - intensity); // 0.1 para 90%
+    target.slowUntil = Math.max(target.slowUntil||0, now + secs*1000);
+  }
+
+  // --- Util de steering (homing) ---
+  function steerTowards(obj, tx, ty, blend){
+    const dx=tx-obj.x, dy=ty-obj.y;
+    const d=Math.max(1, Math.hypot(dx,dy));
+    const sp=Math.hypot(obj.vx||0,obj.vy||0) || 1;
+    const tvx=dx/d*sp, tvy=dy/d*sp;
+    obj.vx=(obj.vx||0)*(1-blend)+tvx*blend;
+    obj.vy=(obj.vy||0)*(1-blend)+tvy*blend;
+  }
+
+  // --- Fate Stacks (cálculo & CDR = 10%/stack, máx. 50%) ---
+  function fateStacksFor(h){
+    if(h.kit!=='fate') return 0;
+    const infl=+U.influence.value||0;
+    if(infl<=0) return 0;
+    let n=0;
+    for(const s of stars){
+      const d=Math.hypot(h.x-s.x,h.y-s.y);
+      if(d<=infl){ n++; if(n>=5) break; }
+    }
+    return Math.min(5,n);
+  }
+  function fateCDMul(h){
+    if(h.kit!=='fate') return 1;
+    const per = 0.10;                 // 10% por stack
+    const stacks = fateStacksFor(h);  // 0..5
+    const red = Math.min(0.50, stacks * per);
+    return Math.max(0.2, 1 - red);
+  }
+  // === FATE — Passiva: Salto Astral Automático (teleporte entre astros) ===
+  // CD fixo de 5s; ao chegar aplica Slow 90% por 1.25s em 250u e causa grande dano.
+  function tryFateAstralHop(h, dt){
+    if (h.kit !== 'fate' || !h.alive) return;
+
+    // cooldown em segundos (regredindo com dt do frame)
+    h._fateHopT = Math.max(0, (h._fateHopT||0) - dt);
+    if (h._fateHopT > 0) return;
+
+    // precisa estar sobre um astro
+    const here = isOnAnyStar(h);
+    if (!here) return;
+
+    // escolhe o astro mais distante do atual
+    let to = null, bestD2 = -1;
+    for (const s of stars){
+      if (s === here) continue;
+      const dx = s.x - here.x, dy = s.y - here.y;
+      const d2 = dx*dx + dy*dy;
+      if (d2 > bestD2){ bestD2 = d2; to = s; }
+    }
+    if (!to) return;
+
+    // Calcula ponto seguro na órbita do destino (na direção origem->destino)
+    const vx = to.x - here.x, vy = to.y - here.y;
+    const len = Math.hypot(vx, vy) || 1;
+    const nx = vx/len, ny = vy/len;
+    const SAFE_OFFSET = 48;                            // margem além do raio do astro
+    const landR = (to.r || 0) + SAFE_OFFSET + (h.r||0)*0.2;
+    const tx = to.x + nx * landR;
+    const ty = to.y + ny * landR;
+
+    // FX de blink
+    effects.push({ type:'blink', x0:h.x, y0:h.y, x1:tx, y1:ty, t:0, dur:0.28, color:hexToRgba('#ffd400', 0.95) });
+    SND.zap?.();
+
+    // Teleporta
+    h.x = tx; h.y = ty;
+
+    // Ao chegar: Slow forte + dano pesado
+    const AOE_RADIUS = 250;
+    const SLOW_INT   = 0.90;            // 90%
+    const SLOW_SECS  = 1.25;
+    const DMG_BASE   = 360;             // ajuste fino à vontade
+    const DMG_AP_MUL = 0.90;            // escala com AP
+
+    const r2 = AOE_RADIUS*AOE_RADIUS;
+    for (const foe of enemiesOf(h.id)){
+      if (!foe.alive) continue;
+      const dx = foe.x - h.x, dy = foe.y - h.y;
+      const d2 = dx*dx + dy*dy;
+      if (d2 <= r2){
+        applySlow(foe, SLOW_INT, SLOW_SECS);
+        const ap = (h.ap || 0);
+        damage(foe, DMG_BASE + DMG_AP_MUL*ap, {x:0,y:0}, h.id);
+      }
+    }
+    effects.push({ type:'boom', x:h.x, y:h.y, t:0, dur:0.45, color:hexToRgba('#ffd400',1) });
+
+    // Reinicia cooldown (5s)
+    h._fateHopT = 5.0;
+  }
+
+  const WANDA_PASSIVE_CD = 3.0; // ✅ 3 segundos
+  const PHOENIX_TRIPLE_CD = 3.0;
+  const PHOENIX_ULT_DPS   = 18; 
+  // Phoenix — Pós-renascimento
+  const PHO_REBORN_SECS = 8.0;
+  const PHO_REBORN_AURA = 160;
+  const PHO_REBORN_RATE = 2.6; // multiplicador da Taxa de Disparo (bolts)
+
+  function makeHero(team, slot){
+    const cfg = teamCfg[slot || team], kit=HERO_KITS[cfg.kit];
+    const spot = findSafeSpawn();
+    const h = {
+      id:team, kit:cfg.kit, label:cfg.name,
+      x:spot.x, y:spot.y, vx:0, vy:0, r:5.5,
+      hex:cfg.color, color:hexToRgba(cfg.color,0.95),
+      trail:[],
+      maxHp:cfg.hp, hp:cfg.hp,
+      shield:0, ankh:0, wInvul:0,               // Wanda invul/Fate ankh/escudo padrão
+      iceLayers:0, iceCd:0,                      // 🧊 anéis de gelo & cooldown da passiva
+      cd:{bolt:0,orb:0,wave:0,shield:0},
+      ultCD:0, ultMax:cfg.ultCd,
+      alive:true, respawn:0,
+      style:cfg.style, accBolt:cfg.accBolt,
+      thinkMin:kit.think.min, thinkMax:kit.think.max,
+      speedMul:cfg.speedMul, boltMul:cfg.boltMul,
+      boltRateMul: (cfg.boltRateMul==null? 1.00 : cfg.boltRateMul), // 🔥 taxa de ataque de bolts
+      nitro:{charge:NITRO.cap, cap:NITRO.cap},
+      grace:SPAWN_GRACE,
+
+      // temporários e passivas
+      hasteUntil: 0,
+      slowMul: 1, slowUntil: 0,
+      _lokiBlinkNext: 0,
+      magnetoRoamUntil: 0,
+      // Wanda passiva (bolt duplo) — agora 3s
+      wandaDoubleT: (cfg.kit==='wanda'? WANDA_PASSIVE_CD : 0.0),
+
+      // Emma Frost — Forma de Diamante (timers)
+      _efUntil: 0,       // até quando está em diamante (invuln + sem projéteis)
+      _efLock:  0,       // trava interna para não re-disparar consecutivamente
+
+      // Phoenix — passiva e ULT
+      _phT: (cfg.kit==='phoenix' ? 5.0 : 0.0), // timer da passiva
+      _phoUltUntil: 0,   // até quando está na ULT
+      _phoUltR: 0,       // raio da ULT
+      _phoenixRebornFlag: null, // dados de renascimento
+      _phoRebornUntil: 0,
+      _phoRebornAuraR: 0,
+      _phoRebornBoltRatePrev: null,
+      _phoTripleT: (cfg.kit==='phoenix' ? PHOENIX_TRIPLE_CD : 0.0), // ⬅️ novo
+    };
+    return h;
+  }
+
+  const heroes = [];
+  
+function setGameMode(mode){
+  mode = mode || ((U.gameMode && U.gameMode.value) || '2v2');
+  heroes.length = 0;
+  if(mode==='1v1'){
+    heroes.push(makeHero('A','A'));
+    heroes.push(makeHero('B','B'));
+  }else{
+    heroes.push(makeHero('A','A'));
+    heroes.push(makeHero('A','C'));
+    heroes.push(makeHero('B','B'));
+    heroes.push(makeHero('B','D'));
+  }
+  if(window.__COSMO_ROUND__){ window.__COSMO_ROUND__.resetLivesForMode(mode); window.__COSMO_ROUND__.setScore(0,0); }syncScoreboard && syncScoreboard();
+}
+window.setGameMode = setGameMode;
+
+function heroesOf(team){ return heroes.filter(h=>h.id===team); }
+  function enemiesOf(team){ return heroes.filter(h=>h.id!==team); }
+  function nearestEnemyOf(hero){
+    let best=null,bd=Infinity; for(const foe of enemiesOf(hero.id)){ if(!foe.alive) continue; const d=(foe.x-hero.x)**2+(foe.y-hero.y)**2; if(d<bd){ bd=d; best=foe; } } return best;
+  }
+  function slotForNewHero(team){ const n=heroesOf(team).length; if(team==='A') return (n%2===0?'A':'C'); return (n%2===0?'B':'D'); }
+  function addHero(team){ const h=makeHero(team, slotForNewHero(team)); heroes.push(h); seedVelocities(); updateScores(); }
+
+  function seedVelocities(){
+    for(const h of heroes){
+      const a=randAngle(); const u=unit(a);
+      const base=+U.speed.value * h.speedMul;
+      h.vx=u.x*base; h.vy=u.y*base;
+    }
+  }
+  seedVelocities();
+
+  // Dano & kill
+  // antes: function damage(target,amount,knock={x:0,y:0},sourceTeam=null){
+  function damage(target, amount, knock={x:0,y:0}, sourceTeam=null, opts={}){
+    if(!target.alive) return;
+
+    // invulnerabilidades (graça, ankh, wInvul) continuam protegendo
+    if(!opts?.pierceInvul && isInvulnerable(target)) return;
+
+    // escudo padrão pode ser perfurado quando opts.pierceShield === true
+    if(target.shield>0 && !opts?.pierceShield) return;
+
+    const mult = +U.dmg.value;
+    target.hp -= amount * mult;
+    target.vx += knock.x; target.vy += knock.y;
+
+    spawnHit(target.x, target.y, target.color);
+
+    if(target.kit==='magneto' && target.alive){
+      const now=performance.now();
+      if(target.hp/Math.max(1,target.maxHp) < 0.5 && now >= (target.magnetoRoamUntil||0)){
+        target.magnetoRoamUntil = now + 5000;
+      }
+    }
+
+    if(target.hp<=0){
+      kill(target, sourceTeam);
+    }
+  }
+
+  function kill(h,killerTeam){
+    if(!h.alive) return;
+    if(isInvulnerable(h)) return;
+
+    // limpar estados
+    cancelIllusionsOf(h, true);
+    removeMagnetoFieldsOf(h);
+
+    const onStar = (h.kit==='phoenix' && isOnAnyStar(h) && !h._phoenixRebornFlag);
+    h.alive = false;
+    h.respawn = onStar ? 0.8 : 2.5;
+    if (onStar){
+      const s = nearestStarAt(h.x, h.y); // helper simples
+      h._phoenixRebornFlag = s ? { x:s.x, y:s.y, r:s.r, type:s.type } : { x:h.x, y:h.y };
+    }
+
+    spawnExplosion(h.x,h.y,h.color);
+
+    if((((window.__COSMO_CFG__||{}).U||{}).gameMode?.value||'2v2')==='1v1' && killerTeam && killerTeam !== h.id && !(onStar && h.kit==='phoenix')){ scores[killerTeam]++; updateScores(); }
+    if (typeof heroDied==='function'){ heroDied(h.id); }
+  }
+
+  function tryRespawn(h){
+    if(h.alive) return;
+    h.respawn -= dtGlobal;
+    if(h.respawn>0) return;
+
+    // 🔥 FÊNIX — renasce no astro em 0.8s com 50% do HP
+    if(h.kit==='phoenix' && h._phoenixRebornFlag){
+      const spot = h._phoenixRebornFlag;
+
+      const keepCd   = {...(h.cd||{})};
+      const keepUlt  = h.ultCD || 0;
+      const keepWand = h.wandaDoubleT || 0;
+      const keepIceC = h.iceCd || 0;
+
+      const fresh = makeHero(h.id);
+      Object.assign(h, {
+        id:fresh.id, kit:fresh.kit, label:fresh.label,
+        x:spot.x, y:spot.y, vx:0, vy:0, r:fresh.r, hex:fresh.hex, color:fresh.color,
+        trail:[], maxHp:fresh.maxHp, hp:Math.floor(fresh.maxHp*0.70), // Renasce com 70%
+        shield:0, ankh:0, wInvul:0.6, iceLayers:0,
+        cd: keepCd, ultCD: keepUlt, ultMax:fresh.ultMax,
+        alive:true, respawn:0,
+        style:fresh.style, accBolt:fresh.accBolt,
+        thinkMin:fresh.thinkMin, thinkMax:fresh.thinkMax,
+        speedMul:fresh.speedMul, boltMul:fresh.boltMul,
+        boltRateMul: (fresh.boltRateMul==null? 1.00 : fresh.boltRateMul),
+        nitro:{charge:NITRO.cap, cap:NITRO.cap}, grace:0.2,
+        hasteUntil:0, slowMul:1, slowUntil:0, _lokiBlinkNext:0, magnetoRoamUntil:0,
+        wandaDoubleT: (fresh.kit==='wanda' ? keepWand : 0),
+        iceCd: keepIceC,
+        _efUntil: 0, _efLock: 0
+      });
+      
+      const now = performance.now();
+      h._phoRebornUntil = now + PHO_REBORN_SECS*1000;
+      h._phoRebornAuraR = PHO_REBORN_AURA;
+      // buff de disparo (guarda e aplica)
+      h._phoRebornBoltRatePrev = h.boltRateMul || 1;
+      h.boltRateMul = (h.boltRateMul || 1) * PHO_REBORN_RATE;
+      // haste usando mecanismo existente
+      h.hasteUntil = Math.max(h.hasteUntil||0, now + PHO_REBORN_SECS*1000);
+      // FX do renascimento
+      effects.push({ type:'boom', x:spot.x, y:spot.y, t:0, dur:0.7, color:hexToRgba('#ff9e40',1) });
+      SND.supernova?.();
+
+      h._phoenixRebornFlag = null;
+      return;
+    }
+
+    // ✅ Preserva cooldowns e timers relevantes (não zera ao morrer)
+    const keepCd   = {...(h.cd||{})};
+    const keepUlt  = h.ultCD || 0;
+    const keepWand = h.wandaDoubleT || 0;
+    const keepIceC = h.iceCd || 0;
+
+    const fresh = makeHero(h.id);
+    Object.assign(h, {
+      id:fresh.id, kit:fresh.kit, label:fresh.label,
+      x:fresh.x, y:fresh.y, vx:0, vy:0, r:fresh.r, hex:fresh.hex, color:fresh.color,
+      trail:[], maxHp:fresh.maxHp, hp:fresh.hp,
+      shield:0, ankh:0, wInvul:0, iceLayers:0,
+      cd: keepCd,                      // ⬅️ mantém
+      ultCD: keepUlt, ultMax:fresh.ultMax,
+      alive:true, respawn:0,
+      style:fresh.style, accBolt:fresh.accBolt,
+      thinkMin:fresh.thinkMin, thinkMax:fresh.thinkMax,
+      speedMul:fresh.speedMul, boltMul:fresh.boltMul,
+      boltRateMul: (fresh.boltRateMul==null? 1.00 : fresh.boltRateMul),
+      nitro:{charge:NITRO.cap, cap:NITRO.cap}, grace:SPAWN_GRACE,
+      hasteUntil:0, slowMul:1, slowUntil:0, _lokiBlinkNext:0, magnetoRoamUntil:0,
+      wandaDoubleT: (fresh.kit==='wanda' ? keepWand : 0),
+      iceCd: keepIceC,               // ⬅️ mantém CD da passiva do gelo
+      _efUntil: 0, _efLock: 0        // Emma: limpa estados ao renascer
+    });
+  }
+// Phoenix — asas delta (linhas/chevrons)
+function drawPhoenixDeltaWings(h, now){
+  const r = h.r;
+
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  // leve oscilação
+  ctx.rotate(Math.sin(now/300)*0.08);
+
+  // 3 "linhas" por lado (ajuste len/w/gap para estilizar)
+  const tiers = [
+    { len: r + 48, w: 6.0, fade: 0.85, gap:  0 },
+    { len: r + 58, w: 4.0, fade: 0.65, gap:  8 },
+    { len: r + 68, w: 2.6, fade: 0.45, gap: 14 }
+  ];
+
+  for (const side of [-1, 1]) {
+    for (const t of tiers) {
+      const x0 = side * (r + 12 + t.gap);
+      const x1 = side * (r + 12 + t.gap + t.len);
+
+      // gradiente: transparente → laranja → âmbar claro
+      const g = ctx.createLinearGradient(x0, 0, x1, 0);
+      g.addColorStop(0.00, 'rgba(255,128,48,0)');
+      g.addColorStop(0.25, hexToRgba('#ff6d00', t.fade));
+      g.addColorStop(1.00, hexToRgba('#ffd7a6', t.fade*0.9));
+      ctx.fillStyle = g;
+
+      // "delta" (quad afunilado tipo seta)
+      ctx.beginPath();
+      ctx.moveTo(x0, -t.w);
+      ctx.lineTo(x1, -t.w*0.35);
+      ctx.lineTo(x1,  t.w*0.35);
+      ctx.lineTo(x0,  t.w);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+  // Desenho herói + campos/auras
+  function drawHero(h){
+    if(!h.alive) return;
+    const now=performance.now();
+    const life=+U.trailSecs.value*1000;
+    const pts=h.trail.filter(p=>now-p.t<=life);
+    withCamera(()=>{
+      if(pts.length>1){
+        ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
+        for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
+        const grad=ctx.createLinearGradient(pts[0].x,pts[0].y,pts[pts.length-1].x,pts[pts.length-1].y);
+        grad.addColorStop(0,h.color.replace(/0\.95\)/,'0.00)'));
+        grad.addColorStop(1,h.color);
+        ctx.strokeStyle=grad; ctx.lineWidth=+U.trailW.value; ctx.stroke();
+      }
+
+      // Corpo (Emma brilha mais em Diamante)
+      ctx.beginPath(); ctx.arc(h.x,h.y,h.r,0,Math.PI*2-1e-4);
+      const isDia = isEmmaDiamond(h);
+      const fillCol = isDia ? hexToRgba('#e6fbff',0.98) : h.color;
+      ctx.fillStyle=fillCol; ctx.shadowBlur=isDia?36:24; ctx.shadowColor=fillCol; ctx.fill(); ctx.shadowBlur=0;
+
+      // Barras
+      const bw=42,bh=4,px=h.x-bw/2,py=h.y-14;
+      ctx.fillStyle='rgba(255,255,255,0.18)'; ctx.fillRect(px,py,bw,bh);
+      const frac=Math.max(0,h.hp/h.maxHp); ctx.fillStyle='rgba(120,240,120,0.9)'; ctx.fillRect(px,py,bw*frac,bh);
+      const nfrac=Math.max(0,h.nitro.charge/h.nitro.cap); ctx.fillStyle='rgba(120,180,255,0.9)'; ctx.fillRect(px,py+bh+2,bw*nfrac,bh*0.8);
+
+      // Escudos/Invulns
+      if(h.shield>0){ strokeHalo(h.x,h.y,h.r+8,2,'rgba(120,200,255,0.95)'); }
+      if(h.ankh>0){ const r=h.r+22; const puls=1+Math.sin(now/220)*0.06; strokeHalo(h.x,h.y,r*puls,2.4,'rgba(255,215,0,0.95)'); }
+      if(h.wInvul>0){
+  const r = h.r + 22;
+  const puls = 1 + Math.sin(now/170) * 0.06;
+  // Emma usa tom branco-azulado; demais continuam vermelhos
+  const col   = (h.kit==='emma') ? '#e6f3ff' : (h.kit==='phoenix' ? '#ff8030' : '#ff3050');
+  const inner = (h.kit==='emma') ? '#bfe9ff' : (h.kit==='phoenix' ? '#ff8030' : '#ff3050');
+
+  strokeHalo(h.x, h.y, r, 2.4, hexToRgba(col, 0.95));
+  ctx.globalAlpha = (h.kit==='emma') ? (0.18 + 0.08*Math.sin(now/200))
+                  : (h.kit==='phoenix') ? (0.20 + 0.12*Math.sin(now/180))
+                  : (0.14 + 0.10*Math.sin(now/200));
+  fillCircle(h.x, h.y, r*0.92*puls, hexToRgba(inner, (h.kit==='emma')?0.28:(h.kit==='phoenix')?0.32:0.35));
+  ctx.globalAlpha = 1;
+}
+
+      if(h.grace>0){ const r2=h.r+14; const a=0.35+0.25*Math.sin(now/160); strokeHalo(h.x,h.y,r2,1.8,`rgba(200,255,200,${a.toFixed(3)})`); }
+
+      // 🧊 Anéis de gelo passivos (0..3) — só mostram quando prontos (iceCd<=0)
+      if((h.iceLayers||0)>0 && (h.iceCd||0)<=0){
+        const base = '#8fdcff';
+        const r1 = h.r + 10 + 2*Math.sin(now/180);
+        const r2 = r1 + 6;
+        strokeHalo(h.x,h.y,r1,1.8,hexToRgba(base,0.95));
+        if(h.iceLayers>=2){
+          strokeHalo(h.x,h.y,r2,1.6,hexToRgba(base,0.75));
+        }
+        if(h.iceLayers>=3){
+          const r3 = r2 + 6;
+          strokeHalo(h.x,h.y,r3,1.4,hexToRgba(base,0.60));
+        }
+      }
+
+      // EMMA — efeito de diamante (faíscas e halo azul-claro)
+      if(isDia){
+        const rD = h.r + 18 + 3*Math.sin(now/160);
+        strokeHalo(h.x,h.y,rD,2.2,hexToRgba('#c9f7ff',0.95));
+        ctx.globalAlpha = 0.16;
+        fillCircle(h.x,h.y,rD*0.92,hexToRgba('#dffbff',0.22));
+        ctx.globalAlpha = 1;
+      }
+
+      // PHOENIX — campo da ULT (roubo de projéteis)
+      if(h.kit==='phoenix' && now < (h._phoUltUntil||0)){
+        const r1 = (h._phoUltR||340) * (0.95 + 0.06*Math.sin(now/150));
+        const col = hexToRgba(h.hex, 0.75);
+        strokeHalo(h.x,h.y,r1,2.2,col);
+        ctx.globalAlpha=0.14; fillCircle(h.x,h.y,r1*0.95,hexToRgba(h.hex,0.12)); ctx.globalAlpha=1;
+        
+        // Chamas orbitais
+        ctx.save(); ctx.translate(h.x,h.y); ctx.rotate(now/400);
+        for(let i=0;i<6;i++){
+          const a0 = i*(Math.PI*2/6);
+          const rx = Math.cos(a0)*(r1*0.8), ry = Math.sin(a0)*(r1*0.8);
+          const flameR = 8 + 3*Math.sin(now/120 + i);
+          fillCircle(rx, ry, flameR, hexToRgba('#ff8030', 0.85));
+        }
+        ctx.restore();
+      }
+
+      // PHOENIX — visual pós-renascimento (halo + asas delta)
+if (h.kit==='phoenix' && h._phoRebornUntil && performance.now() < h._phoRebornUntil){
+  const now = performance.now();
+  const R = (h._phoRebornAuraR||PHO_REBORN_AURA) * (0.95 + 0.05*Math.sin(now/170));
+  const halo = hexToRgba('#ff9e40', 0.90);
+  strokeHalo(h.x, h.y, R, 2.4, halo);
+  ctx.globalAlpha = 0.18; fillCircle(h.x, h.y, R*0.95, hexToRgba('#ff6d00', 0.22)); ctx.globalAlpha = 1;
+
+  // asas "delta" (linhas/chevrons)
+  drawPhoenixDeltaWings(h, now);
+}
+
+
+      // Campo de força do Magneto durante ULT
+      if(h.kit==='magneto' && isMagUlting(h)){
+        const r1 = 70*(1+0.06*Math.sin(now/130));
+        const r2 = 70*1.25*(1+0.05*Math.cos(now/180));
+        const col = hexToRgba(h.hex,0.65);
+        strokeHalo(h.x,h.y,r1,2.2,col);
+        ctx.globalAlpha=0.30; fillCircle(h.x,h.y,r1*0.92,hexToRgba(h.hex,0.10)); ctx.globalAlpha=1;
+        ctx.save(); ctx.translate(h.x,h.y); ctx.rotate(now/600); ctx.strokeStyle=hexToRgba(h.hex,0.85); ctx.lineWidth=2;
+        for(let i=0;i<3;i++){
+          const a0=i*(Math.PI*2/3)+(now%1200)/1200*2*Math.PI*0.7;
+          ctx.beginPath(); ctx.arc(0,0,r2,a0,a0+Math.PI/3); ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      // Aura do Magneto quando <50% HP / roaming
+      if(h.kit==='magneto' && (now < (h.magnetoRoamUntil||0) || h.hp/h.maxHp<0.5)){
+        const rA = h.r + 20 + 6*Math.sin(now/140);
+        strokeHalo(h.x,h.y,rA,2,hexToRgba('#9aa3ff',0.9));
+        ctx.globalAlpha=0.18;
+        fillCircle(h.x,h.y,rA*0.9,hexToRgba('#9aa3ff',0.25));
+        ctx.globalAlpha=1;
+      }
+
+      // Doctor Fate — runas/stacks
+      if(h.kit==='fate'){
+        const stacks = fateStacksFor(h);
+        const R = 16;
+        for(let i=0;i<stacks;i++){
+          const ang = now/420 + i*(Math.PI*2/Math.max(1,stacks));
+          const rx = h.x + Math.cos(ang)*R;
+          const ry = h.y + Math.sin(ang)*R;
+          ctx.save();
+          ctx.translate(rx,ry);
+          ctx.rotate(Math.PI/4 + ang*0.6);
+          ctx.fillStyle='rgba(255,215,0,0.95)';
+          ctx.beginPath(); // losango
+          ctx.moveTo(0,-4); ctx.lineTo(4,0); ctx.lineTo(0,4); ctx.lineTo(-4,0); ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+    });
+  }
+
+  // Magias (com CDR do Fate aplicado)
+  function withFateCD(h, base){ return base * fateCDMul(h); }
+
+  function castShield(caster){
+    caster.shield=1.6;
+    caster.cd.shield = withFateCD(caster, 6.0);
+    SND.shield();
+  
+    if(caster.kit==='fate' && fateStacksFor(caster)>=5){
+      fateBlinkToStarEdge(caster);
+    }
+  }
+  function castWave(caster){
+    if(caster.kit==='fate' && fateStacksFor(caster)>=4){
+      const now = performance.now();
+      timeSands.push({ x: caster.x, y: caster.y, r: 220, until: now + 2500, owner: caster });
+      effects.push({type:'boom', x:caster.x, y:caster.y, t:0, dur:0.45, color:hexToRgba('#ffd870',1)});
+      caster.cd.wave = withFateCD(caster, 3.2);
+      SND.wave();
+      return;
+    }
+    caster.cd.wave = withFateCD(caster, 3.2);
+    waves.push({x:caster.x,y:caster.y,r:10,max:140,w:10,t:0,dur:0.5,caster,hitSet:new Set(),isSuper:false,ice:(caster&&caster.kit==='iceman')});
+    SND.wave();
+  }
+  function castOrbFan(caster,target){
+    // Emma em diamante não lança projéteis
+    if(isEmmaDiamond(caster)) return;
+    if(!target) return;
+    const dx=target.x-caster.x, dy=target.y-caster.y; const baseDir=Math.atan2(dy,dx);
+    const spread=Math.PI/18, count=5, init=3.2;
+    for(let i=0;i<count;i++){
+      const off=(i-(count-1)/2)*spread; const a=baseDir+off; const u={x:Math.cos(a),y:Math.sin(a)};
+      projectiles.push({x:caster.x+u.x*6,y:caster.y+u.y*6,vx:u.x*init,vy:u.y*init,r:3,ttl:3.0,caster,visualCaster:caster});
+    }
+    caster.cd.orb = withFateCD(caster, Math.max(0,+U.orbCd.value||2.5));
+    SND.orb();
+  }
+  function castBoltTravel(caster,target){
+    // Emma em diamante não lança projéteis
+    if(isEmmaDiamond(caster)) return;
+    if(!target) return;
+    const dx=target.x-caster.x, dy=target.y-caster.y; const d=Math.max(1,len2(dx,dy)); const u={x:dx/d,y:dy/d};
+    const heroBolt = (+U.boltSpeed.value||12) * (caster.boltMul||1);
+    const hitChance=caster.accBolt;
+    let dir=Math.atan2(u.y,u.x); if(Math.random()>hitChance){ const maxAng=Math.PI/9; dir+=(Math.random()*2-1)*maxAng; }
+    const vx=Math.cos(dir)*heroBolt, vy=Math.sin(dir)*heroBolt;
+    bolts.push({x:caster.x,y:caster.y,vx,vy,w:3.5,ttl:2.6,caster,visualCaster:caster,path:[],ult:false,lethal:false});
+    // 🔥 Aplica taxa de ataque por-herói (divide o CD)
+    const baseCd = Math.max(0,+U.boltCd.value||0);
+    const rate   = Math.max(0.1, caster.boltRateMul||1);
+    if(caster.cd) caster.cd.bolt = withFateCD(caster, baseCd / rate);
+    SND.zap();
+  }
+
+  // Emma Frost — ULT: stasis + blink + haste
+  function emmaUlt(h){
+    if(!h || !h.alive) return;
+    const now = performance.now();
+
+    // 1) Stasis nos projéteis inimigos
+    const R = 240, T = 1600;
+    for (const p of projectiles) {
+      if (!p || !p.caster || p.caster.id === h.id) continue;
+      if (Math.hypot(p.x-h.x, p.y-h.y) <= R) { p.stasisUntil = now + T; p.vx = 0; p.vy = 0; }
+    }
+    for (const b of bolts) {
+      if (!b || !b.caster || b.caster.id === h.id) continue;
+      if (Math.hypot(b.x-h.x, b.y-h.y) <= R) { b.stasisUntil = now + T; b.vx = 0; b.vy = 0; }
+    }
+    spawnExplosion(h.x, h.y, hexToRgba('#e0f7ff',1));
+    SND.shield?.();
+
+    // 2) Teleporta e ganha Haste
+    const foe = nearestEnemyOf(h);
+    if (foe) {
+      const ang  = Math.atan2(h.y-foe.y, h.x-foe.x);
+      const dist = 110;
+      const tx = clamp(foe.x + Math.cos(ang)*dist, 8, WW_get()-8);
+      const ty = clamp(foe.y + Math.sin(ang)*dist, 8, WH_get()-8);
+      effects.push({type:'blink', x0:h.x, y0:h.y, x1:tx, y1:ty, t:0, dur:0.32, color:hexToRgba('#e0f7ff',0.95)});
+      h.x = tx; h.y = ty;
+      h.hasteUntil = now + 6000;
+    }
+
+    // 3) Liga Diamante e aplica o hit da passiva (fura ESCUDO)
+    h._efUntil = now + 3000;   // 3s em diamante
+    h._efLock  = now + 80;   // trava re-disparo
+    const tgt = (foe && foe.alive) ? foe : nearestEnemyOf(h);
+    if (tgt && tgt.alive) {
+      const dx = tgt.x - h.x, dy = tgt.y - h.y;
+      const d  = Math.hypot(dx, dy) || 1;
+      damage(tgt, 60, { x: dx/d*0.8, y: dy/d*0.8 }, h.id, { pierceShield: true }); // ignora ESCUDO
+      effects.push({ type:'boom', x:h.x, y:h.y, t:0, dur:0.5, color:hexToRgba('#e0f7ff',1) });
+      SND.shield?.();
+    }
+
+    // recarga
+    h.ultCD = h.ultMax;
+  }
+
+  // Wanda — Passiva: Bolt Duplo a cada 3s (paralelos, mirando o alvo)
+  function castWandaDoubleBolt(caster){
+    if(!caster || !caster.alive) return;
+    const target = nearestEnemyOf(caster); if(!target) return;
+    const dx=target.x-caster.x, dy=target.y-caster.y;
+    const d=Math.max(1, Math.hypot(dx,dy));
+    const ux=dx/d, uy=dy/d;                   // direção ao alvo
+    const px=-uy, py=ux;                      // perpendicular
+    const offset=6.0;
+    const speed=(+U.boltSpeed.value||12) * (caster.boltMul||1);
+    // opcional: imprecisão
+    let dir=Math.atan2(uy,ux);
+    if(Math.random()>caster.accBolt){ const maxAng=Math.PI/9; dir+=(Math.random()*2-1)*maxAng; }
+    const vx=Math.cos(dir)*speed, vy=Math.sin(dir)*speed;
+
+    bolts.push({ x: caster.x + px*offset, y: caster.y + py*offset, vx, vy, w:3.5, ttl:2.6, caster, visualCaster:caster, path:[], ult:false, lethal:false });
+    bolts.push({ x: caster.x - px*offset, y: caster.y - py*offset, vx, vy, w:3.5, ttl:2.6, caster, visualCaster:caster, path:[], ult:false, lethal:false });
+    SND.zap();
+  }
+  function castPhoenixTripleBolt(caster){
+  if(!caster || !caster.alive) return;
+  const target = nearestEnemyOf(caster); if(!target) return;
+
+  const dx = target.x - caster.x, dy = target.y - caster.y;
+  const d  = Math.max(1, Math.hypot(dx,dy));
+  const ux = dx/d, uy = dy/d;
+  const px = -uy, py = ux;                 // perpendicular
+  const speed = (+U.boltSpeed.value||12) * (caster.boltMul||1);
+
+  // leve imprecisão conforme acc
+  let dir = Math.atan2(uy, ux);
+  if(Math.random() > caster.accBolt){ const maxAng = Math.PI/9; dir += (Math.random()*2-1)*maxAng; }
+  const vx = Math.cos(dir)*speed, vy = Math.sin(dir)*speed;
+
+  // offsets laterais + centro
+  const offs = [-7, 0, 7];
+  for(const o of offs){
+    bolts.push({
+      x: caster.x + px*o, y: caster.y + py*o,
+      vx, vy, w:3.5, ttl:2.6,
+      caster, visualCaster: caster, path:[], ult:false, lethal:false
+    });
+  }
+  SND.zap();
+}
+
+  // ULT placeholders/implementações (Magneto real na Parte 4; Ice Man implementado aqui)
+  function wandaUlt(h){
+    const N=48, spread=2*Math.PI;
+    const speed=(+U.boltSpeed.value||12)*1.15*(h.boltMul||1);
+    for(let i=0;i<N;i++){
+      const ang=(i/N)*spread; const vx=Math.cos(ang)*speed, vy=Math.sin(ang)*speed;
+      bolts.push({ x:h.x, y:h.y, vx, vy, w:3.6, ttl:2.8, caster:h, visualCaster:h, path:[], ult:true, lethal:true });
+    }
+    // 🛡️ Escudo invulnerável vermelho
+    h.wInvul = Math.max(h.wInvul||0, 2.0);
+    effects.push({type:'boom',x:h.x,y:h.y,t:0,dur:0.8,color:hexToRgba(h.hex,1)}); h.ultCD = h.ultMax;
+  }
+  function fateUlt(h){
+    h.ankh = 5.0;
+    // ✅ Cura total
+    h.hp = h.maxHp;
+    for(let i=0;i<5;i++){
+      setTimeout(()=>waves.push({x:h.x,y:h.y,r:12,max:220,w:10,t:0,dur:0.6,caster:h,isSuper:false,hitSet:new Set(),gold:true}), i*150);
+    }
+    SND.shield(); h.ultCD = h.ultMax;
+  }
+  function magnetoUltPlaceholder(h){
+    // substituída pela Parte 4
+    waves.push({x:h.x,y:h.y,r:16,max:260,w:14,t:0,dur:0.7,caster:h,isSuper:false,hitSet:new Set(),magnetic:true});
+    effects.push({type:'boom',x:h.x,y:h.y,t:0,dur:0.9,color:'rgba(140,160,255,1)'}); SND.zap();
+    h.ultCD = h.ultMax;
+  }
+
+  // 🧊 ICE MAN — ULT Explosão Congelante
+  function icemanUlt(h){
+    if(!h || !h.alive) return;
+    const target = nearestEnemyOf(h);
+    // FX
+    spawnExplosion(h.x, h.y, hexToRgba('#8fdcff', 1));
+    SND.zap();
+
+    // Pulsos de empurrão em sequência centrados no alvo (ou no caster caso não haja alvo)
+    const cx = (target && target.alive) ? target.x : h.x;
+    const cy = (target && target.alive) ? target.y : h.y;
+
+    const pulses = 7 + Math.floor(Math.random()*2); // 7-8 pulsos
+    for(let i=0;i<pulses;i++){
+      setTimeout(()=>{
+        waves.push({x:cx,y:cy,r:10,max:140,w:10,t:0,dur:0.45,caster:h,hitSet:new Set(),isSuper:false,ice:true});
+        SND.wave();
+      }, i*120);
+    }
+
+    // Slow 90% por 2s no alvo principal
+    if(target && target.alive){
+      applySlow(target, 0.90, 2.0);
+    }
+
+    // Criar Zona de Gelo (~2.5s) que congela projéteis e converte orbes
+    const now = performance.now();
+    const zone = {
+      owner: h,
+      x: cx, y: cy,
+      r: 180,
+      t0: now,
+      until: now + 2500,
+      pulsate: (Math.random()*Math.PI*2)
+    };
+    iceZones.push(zone);
+
+    // recarga
+    h.ultCD = h.ultMax;
+  }
+
+  // 🔥 FÊNIX — ULT: invulnerável 5s, rouba/atrai projéteis, explode no fim
+  function phoenixUlt(h){
+    if(!h || !h.alive) return;
+    const now = performance.now();
+    h.wInvul = Math.max(h.wInvul||0, 5.0);   // 5s invulnerável
+    h._phoUltUntil = now + 5000;
+    h._phoUltR = 340; // usa PHOENIX_ULT_DPS global
+
+    SND.zap(); SND.shield();
+    effects.push({type:'boom', x:h.x, y:h.y, t:0, dur:0.6, color:hexToRgba('#ff6d00',1)});
+
+    // explosão ao final
+    setTimeout(()=>{
+      if(!h.alive) return;
+      const cx=h.x, cy=h.y;
+      waves.push({x:cx,y:cy,r:14,max:420,w:22,t:0,dur:0.9,caster:h,isSuper:true,hitSet:new Set()});
+      for(const foe of enemiesOf(h.id)){
+        if(!foe.alive) continue;
+        const d=Math.hypot(foe.x-cx,foe.y-cy);
+        if(d<=180){ damage(foe, 48, {x:(foe.x-cx)/(d||1)*1.2, y:(foe.y-cy)/(d||1)*1.2}, h.id); }
+      }
+      SND.supernova?.();
+    }, 5050);
+
+    h.ultCD = h.ultMax;
+  }
+
+  const ULT = {
+    wanda:   wandaUlt,
+    fate:    fateUlt,
+    loki:    (h)=>{ // ULT Loki original (clones + escudo curto)
+      if(!h.alive) return;
+      spawnExplosion(h.x, h.y, hexToRgba('#00c853', 1));
+      SND.zap();
+      h.shield = Math.max(h.shield || 0, 2.5); // 2.5s de escudo
+      spawnLokiClones(h, 6.0);
+      h.ultCD = h.ultMax;
+    },
+    magneto: magnetoUltPlaceholder,
+    iceman:  icemanUlt,
+    emma:    emmaUlt,
+    phoenix: phoenixUlt
+  };
+  function heroUltimate(h){ if(h.ultCD>0 || !h.alive) return; (ULT[h.kit]||wandaUlt)(h); }
+
+  // IA
+  function aiTryCast(h,dt){
+    h._think = (h._think||0) - dt; if(h._think>0) return;
+    h._think = (h.thinkMin + Math.random()*(h.thinkMax-h.thinkMin));
+
+    if(!U.battle.checked || !h.alive) return;
+    const foe=nearestEnemyOf(h); if(!foe) return;
+    const dx=foe.x-h.x, dy=foe.y-h.y, d=len2(dx,dy); const rng=+U.engage.value*2;
+    const wantUlt = (h.id==='A'? U.autoUltA.checked : U.autoUltB.checked);
+
+    // Emma em diamante: apenas habilidades não-projéteis (escudo/onda) e ULT
+    const emmaDia = isEmmaDiamond(h);
+
+    if(wantUlt && h.ultCD<=0 && (d<rng*0.75 || h.hp<h.maxHp*0.45)){ heroUltimate(h); return; }
+    if(U.mShield.checked && h.cd.shield<=0 && d<160){ castShield(h); return; }
+    if(U.mWave.checked   && h.cd.wave  <=0 && d<120){ castWave(h);   return; }
+    if(!emmaDia && U.mBolt.checked   && h.cd.bolt  <=0){ castBoltTravel(h,foe); return; }
+    if(!emmaDia && U.mOrb.checked    && h.cd.orb   <=0){ castOrbFan(h,foe);     return; }
+  }
+
+  // Loki: blink ao bloquear com ESCUDO (não com Ankh/wInvul)
+  function tryLokiBlink(hero, originX, originY){
+    if(hero.kit!=='loki') return;
+    if(hero.ankh>0 || hero.wInvul>0) return; // não durante invulns
+    const now=performance.now();
+    if(now < (hero._lokiBlinkNext||0)) return;
+    hero._lokiBlinkNext = now + 550;
+
+    const dx = hero.x - originX, dy = hero.y - originY;
+    const d = Math.hypot(dx,dy) || 1;
+    const dist = 200;
+    const nx = dx/d, ny = dy/d;
+    let tx = hero.x + nx*dist, ty = hero.y + ny*dist;
+
+    const pad=8, WW=WW_get(), WH=WH_get();
+    tx = clamp(tx, pad, WW-pad);
+    ty = clamp(ty, pad, WH-pad);
+
+    effects.push({type:'blink', x0:hero.x, y0:hero.y, x1:tx, y1:ty, t:0, dur:0.28, color:hexToRgba('#00c853',0.95)});
+    SND.zap();
+
+    hero.x = tx; hero.y = ty;
+    hero.hasteUntil = now + 2000; // +20% vel por 2s
+  }
+
+  // Física / paredes
+  function getSpeedMulNow(h){
+    const now=performance.now();
+    let mul = h.speedMul;
+    if(now < (h.hasteUntil||0)) mul *= 1.20;         // haste comum
+    // 🧊 slow ativo
+    if(now < (h.slowUntil||0)) mul *= (h.slowMul||1);
+    
+    if(inAnyTimeSand(h.x,h.y)){
+      mul *= 0.70;
+    }
+    return mul;
+  }
+
+  // 🧊 Passiva do Ice Man — calcula quantos anéis devem estar ativos
+  function updateIcePassive(h){
+    if(h.kit!=='iceman' || !h.alive) { h.iceLayers = h.iceLayers||0; return; }
+    const infl = +U.influence.value || 520;
+    let nearCount = 0, nearBH = false;
+    for(const s of stars){
+      const d = Math.hypot(h.x - s.x, h.y - s.y);
+      if(d <= infl){
+        nearCount++;
+        // +1 anel se próximo a Buraco Negro OU Magnetar
+        if(s.type==='black_hole' || s.type==='magnetar') nearBH = true;
+      }
+    }
+    const now = performance.now();
+    let layers = 0;
+    if(nearBH) layers++;               // +1: buraco negro ou magnetar
+    if(nearCount <= 2) layers++;       // +1: sob influência de ≤2 estrelas
+    if((h._iceFreezeBonusUntil||0) > now) layers++; // +1: bônus recente por congelar projétil
+    h.iceLayers = Math.max(0, Math.min(3, layers)); // máx. 3 anéis
+  }
+
+  function stepHero(h,dt){
+    if(!h.alive) return;
+
+    // ✨ Fate — Passiva: Salto Astral automático
+    tryFateAstralHop(h, dt);
+
+
+    const foe=nearestEnemyOf(h);
+   // --- Phoenix: DPS contínuo da ULT + triple-shot passivo ---
+   if (h.kit === 'phoenix') {
+   const now = performance.now();
+
+  // DPS enquanto a ULT estiver ativa
+  if (now < (h._phoUltUntil || 0)) {
+    const R = h._phoUltR || 340;
+    for (const foe2 of enemiesOf(h.id)) {
+      if (!foe2.alive) continue;
+      const dx = foe2.x - h.x, dy = foe2.y - h.y;
+      const d  = Math.hypot(dx, dy) || 1;
+      if (d <= R) {
+        damage(foe2, PHOENIX_ULT_DPS * dt, { x:(dx/d)*0.15, y:(dy/d)*0.15 }, h.id);
+      }
+    }
+  }
+
+  // Disparo passivo: 3 raios a cada 1s (independente da passiva de 5s)
+  h._phoTripleT = (h._phoTripleT ?? PHOENIX_TRIPLE_CD) - dt;
+  if (h._phoTripleT <= 0) {
+    castPhoenixTripleBolt(h);
+    h._phoTripleT = PHOENIX_TRIPLE_CD;
+  }
+}
+
+    // Passiva Wanda: contador do Bolt Duplo (agora 3s)
+    if(h.kit==='wanda'){
+      h.wandaDoubleT = Math.max(0, (h.wandaDoubleT||0) - dt);
+      if(h.wandaDoubleT<=0){
+        castWandaDoubleBolt(h);
+        h.wandaDoubleT = WANDA_PASSIVE_CD;
+      }
+    }
+
+    // EMMA — Passiva: Forma de Diamante ao encostar em inimigo
+    if(h.kit==='emma' && foe && foe.alive){
+      const now=performance.now();
+      const d = Math.hypot(foe.x-h.x, foe.y-h.y);
+      if(d <= (h.r + foe.r + 1)){
+        if(now >= (h._efLock||0)){
+          // ativa diamante
+          h._efUntil = now + 2000;           // 2s invulnerável
+          h._efLock  = now + 2300;           // trava para re-disparo
+          // Grande dano imediato no inimigo em contato
+          const nx=(foe.x-h.x)/(d||1), ny=(foe.y-h.y)/(d||1);
+          damage(foe, 60, {x:nx*0.8, y:ny*0.8}, h.id, { pierceShield: true });
+          // FX
+          effects.push({type:'boom', x:h.x, y:h.y, t:0, dur:0.5, color:hexToRgba('#e0f7ff',1)});
+          SND.shield?.();
+        }
+      }
+    }
+
+    // 🔥 FÊNIX — Passiva: Onda Telecinética a cada 5s
+    if(h.kit==='phoenix'){
+      h._phT = (h._phT ?? 5.0) - dt;
+      if(h._phT <= 0){
+        const now = performance.now();
+        const R = barrierRadius(h) + 28;
+
+// Disparo passivo: 3 raios a cada 1s
+        h._phoTripleT = (h._phoTripleT ?? PHOENIX_TRIPLE_CD) - dt;
+        if(h._phoTripleT <= 0){
+        castPhoenixTripleBolt(h);
+        h._phoTripleT = PHOENIX_TRIPLE_CD;
+    }
+
+        // parar projéteis inimigos por 2s
+        for(const p of projectiles){
+          if(!p.caster || p.caster.id===h.id) continue;
+          if(Math.hypot(p.x-h.x, p.y-h.y) <= R){
+            p.stasisUntil = now + 2000;
+            p.vx = 0; p.vy = 0;
+            p.visualCaster = p.visualCaster || h;
+          }
+        }
+        for(const b of bolts){
+          if(!b.caster || b.caster.id===h.id) continue;
+          if(Math.hypot(b.x-h.x, b.y-h.y) <= R){
+            b.stasisUntil = now + 2000;
+            b.vx = 0; b.vy = 0;
+            b.visualCaster = b.visualCaster || h;
+          }
+        }
+
+        // dano em inimigos próximos
+        for(const foe2 of enemiesOf(h.id)){
+          if(!foe2.alive) continue;
+          const dx=foe2.x-h.x, dy=foe2.y-h.y, d=Math.hypot(dx,dy);
+          if(d <= R){ damage(foe2, 14, {x:(dx/d)*0.6, y:(dy/d)*0.6}, h.id); }
+        }
+
+        // regeneração (10% HP máx)
+        h.hp = Math.min(h.maxHp, h.hp + h.maxHp*0.10);
+
+        effects.push({type:'boom', x:h.x, y:h.y, t:0, dur:0.45, color:hexToRgba('#ffcc80',1)});
+        SND.shield?.();
+
+        h._phT = 5.0;
+      }
+    }
+        
+          
+    // Phoenix — passiva pós-renascimento (aura + buff temporário)
+    if (h.kit==='phoenix'){
+      const now = performance.now();
+      if (h._phoRebornUntil && now < h._phoRebornUntil){
+        const R = h._phoRebornAuraR || PHO_REBORN_AURA;
+        for (const foe2 of enemiesOf(h.id)){
+          if(!foe2.alive) continue;
+          const dx=foe2.x-h.x, dy=foe2.y-h.y; const d=Math.hypot(dx,dy)||1;
+          if (d <= R){
+            const burn = 14 * dt; // ~14 de dano por segundo
+            damage(foe2, burn, { x:(dx/d)*0.2, y:(dy/d)*0.2 }, h.id);
+          }
+        }
+      } else if (h._phoRebornUntil && now >= h._phoRebornUntil){
+        // encerra buff e restaura taxa de disparo
+        if (h._phoRebornBoltRatePrev != null){
+          h.boltRateMul = h._phoRebornBoltRatePrev;
+          h._phoRebornBoltRatePrev = null;
+        }
+        h._phoRebornUntil = 0;
+      }
+    }
+
+    // Passiva Ice Man
+    updateIcePassive(h);
+
+    // CD da passiva de gelo (contagem)
+    if(h.iceCd>0) h.iceCd = Math.max(0, h.iceCd - dt);
+
+    h.cd.bolt=Math.max(0,h.cd.bolt-dt);
+    h.cd.orb=Math.max(0,h.cd.orb-dt);
+    h.cd.wave=Math.max(0,h.cd.wave-dt);
+    h.cd.shield=Math.max(0,h.cd.shield-dt);
+    if(h.shield>0) h.shield=Math.max(0,h.shield-dt);
+    if(h.ankh>0)   h.ankh  =Math.max(0,h.ankh  -dt);
+    if(h.wInvul>0) h.wInvul=Math.max(0,h.wInvul-dt);
+    if(h.ultCD>0)  h.ultCD =Math.max(0,h.ultCD -dt);
+    if(h.grace>0)  h.grace =Math.max(0,h.grace -dt);
+
+    const warp=(keys.shift?3:1);
+    const base = +U.speed.value * getSpeedMulNow(h) * warp;
+
+    // Gravidade de estrelas (com proteção para dist=0)
+let ax=0, ay=0;
+const infl=+U.influence.value, fall=+U.falloff.value, Gg=+U.gravity.value;
+if (Gg>0 && stars.length){
+  for (const s of stars){
+    const dx = s.x - h.x, dy = s.y - h.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < infl){
+      const distSafe = Math.max(1e-3, dist);             // <-- proteção
+      const soft=25, G=Gg*s.massScale;
+      const acc = G / (Math.pow(distSafe, fall) + soft); // usa distSafe
+      const rx = dx/distSafe, ry = dy/distSafe;
+      ax += rx*acc; ay += ry*acc;
+
+      const curve = +U.curve.value;
+      if (curve>0){
+        const tx = -ry, ty = rx;                         // usa rx/ry já seguros
+        ax += tx*base*curve*0.3*dt;
+        ay += ty*base*curve*0.3*dt;
+      }
+    }
+  }
+}
+
+
+    // Nitro
+    if(foe && NITRO.force>0){
+      const d=len2(foe.x-h.x,foe.y-h.y), rng=+U.engage.value*2;
+      if(d<rng){
+        let want=0; if(h.style==='attack') want=1; else if(h.style==='defense') want=-1; else want=(d>rng*0.6?1:(d<rng*0.35?-1:0));
+        if(want!==0 && h.nitro.charge>0){
+          const dir=Math.atan2(foe.y-h.y,foe.x-h.x)+(want<0?Math.PI:0);
+          ax+=Math.cos(dir)*NITRO.force; ay+=Math.sin(dir)*NITRO.force;
+          h.nitro.charge=Math.max(0,h.nitro.charge-dt);
+        }
+      }
+    }
+
+    // Movimento
+    h.vx += ax*dt; h.vy += ay*dt;
+    const drag=+U.drag.value; h.vx*=(1-drag*dt*60); h.vy*=(1-drag*dt*60);
+    const vlen=Math.hypot(h.vx,h.vy);
+    if(vlen<base){ const a=Math.atan2(h.vy,h.vx); h.vx+=Math.cos(a)*0.05*base*dt*60; h.vy+=Math.sin(a)*0.05*base*dt*60; }
+    h.x += h.vx*dt*60; h.y += h.vy*dt*60;
+
+    // Nitro recarga
+    const cap=NITRO.cap, rec=NITRO.recharge; h.nitro.cap=cap; if(h.nitro.charge<cap) h.nitro.charge=Math.min(cap,h.nitro.charge+rec*dt);
+
+    // Bordas = sem dano
+    const pad=4;
+    let nx=0, ny=0, hitWall=false;
+    const WW = WW_get(), WH = WH_get();
+    if(h.x<pad){ h.x=pad; h.vx=Math.abs(h.vx); hitWall=true; nx=1; }
+    if(h.x>WW-pad){ h.x=WW-pad; h.vx=-Math.abs(h.vx); hitWall=true; nx=-1; }
+    if(h.y<pad){ h.y=pad; h.vy=Math.abs(h.vy); hitWall=true; ny=1; }
+    if(h.y>WH-pad){ h.y=WH-pad; h.vy=-Math.abs(h.vy); hitWall=true; ny=-1; }
+    if(hitWall){ h.vx += nx*0.4; h.vy += ny*0.4; }
+
+    // trilha
+    h.trail.push({x:h.x,y:h.y,t:performance.now()}); if(h.trail.length>1200) h.trail.splice(0,h.trail.length-1200);
+  }
+
+  // Util colisão/barreira
+  function distPointToSegment(px,py,x1,y1,x2,y2){
+    const vx=x2-x1,vy=y2-y1,wx=px-x1,wy=py-y1; const c1=vx*wx+vy*wy; if(c1<=0) return Math.hypot(px-x1,py-y1);
+    const c2=vx*vx+vy*vy; if(c2<=c1) return Math.hypot(px-x2,py-y2);
+    const b=c1/c2; const bx=x1+vx*b,by=y1+vy*b; return Math.hypot(px-bx,py-by);
+  }
+  function closestPointOnSeg(x1,y1,x2,y2,cx,cy){
+    const vx=x2-x1, vy=y2-y1; const l2=vx*vx+vy*vy||1; let t=((cx-x1)*vx+(cy-y1)*vy)/l2; t=Math.max(0,Math.min(1,t));
+    return {x:x1+vx*t, y:y1+vy*t, t};
+  }
+  function nearestStarAt(x,y){
+    let best=null, bd=Infinity;
+    for(const s of stars){
+      const d=(s.x-x)*(s.x-x)+(s.y-y)*(s.y-y);
+      if(d<bd){ bd=d; best=s; }
+    }
+    return best;
+  }
+  function inAnyTimeSand(x,y){
+    const now = performance.now();
+    for(const z of timeSands){
+      if(now<=z.until && Math.hypot(x-z.x,y-z.y)<=z.r) return true;
+    }
+    return false;
+  }
+  function fateBlinkToStarEdge(hero){
+    const s = nearestStarAt(hero.x, hero.y); if(!s) return;
+    const dx = hero.x - s.x, dy = hero.y - s.y;
+    const d  = Math.hypot(dx,dy) || 1;
+    const ux = dx/d, uy = dy/d;
+    const prevX = hero.x, prevY = hero.y;
+    const edgeR = s.r + hero.r + 6;
+    const tx = s.x + ux*edgeR, ty = s.y + uy*edgeR;
+    effects.push({type:'blink', x0:prevX, y0:prevY, x1:tx, y1:ty, t:0, dur:0.28, color:hexToRgba('#ffd400',0.95)});
+    hero.x = tx; hero.y = ty;
+    const now = performance.now();
+    fateGlyphs.push({ x: prevX, y: prevY, until: now + 1000, owner: hero });
+  }
+
+  function reflect(vx,vy,nx,ny,rest=0.88){ const L=Math.hypot(nx,ny)||1e-6; nx/=L; ny/=L; const dot=vx*nx+vy*ny; return {vx:(vx-2*dot*nx)*rest, vy:(vy-2*dot*ny)*rest}; }
+  function lineHitsBarrier(x1,y1,x2,y2,h){ const r=barrierRadius(h); const d=distPointToSegment(h.x,h.y,x1,y1,x2,y2); return d<=r+1; }
+
+  function reboundProjectile(proj, prevX, prevY, hero){
+    const cp=closestPointOnSeg(prevX,prevY,proj.x,proj.y,hero.x,hero.y);
+    let nx=cp.x-hero.x, ny=cp.y-hero.y; const nd=Math.hypot(nx,ny)||1; nx/=nd; ny/=nd;
+    const radProj = (proj.r ?? (proj.w ? proj.w*0.5 : 2));
+    const safeR = barrierRadius(hero) + radProj + 0.5;
+    proj.x = hero.x + nx*safeR; proj.y = hero.y + ny*safeR;
+
+    const rv = reflect(proj.vx, proj.vy, nx, ny, 0.88); proj.vx = rv.vx; proj.vy = rv.vy;
+    proj.visualCaster = hero; proj.ttl *= 0.92;
+
+    
+    if(hero.kit==='fate' && hero.ankh>0 && fateStacksFor(hero)>=3){
+      const foe = nearestEnemyOf(hero);
+      if(foe && foe.alive){
+        const dx = foe.x - hero.x, dy = foe.y - hero.y;
+        const d  = Math.hypot(dx,dy) || 1;
+        const sp = Math.hypot(proj.vx||0, proj.vy||0) || ((+U.boltSpeed.value||12)*(hero.boltMul||1));
+        const rr = barrierRadius(hero) + (proj.r || (proj.w?proj.w*0.5:2)) + 0.5;
+        proj.x = hero.x + (dx/d)*rr;
+        proj.y = hero.y + (dy/d)*rr;
+        proj.vx = (dx/d)*sp*1.02;
+        proj.vy = (dy/d)*sp*1.02;
+        proj.caster = hero;
+        proj.visualCaster = hero;
+        proj.ttl *= 0.95;
+        SND.zap && SND.zap();
+        return;
+      }
+    }
+// Loki: blink apenas quando for ESCUDO normal
+    if(hero.kit==='loki' && hero.shield>0 && hero.ankh<=0 && hero.wInvul<=0){
+      tryLokiBlink(hero, prevX, prevY);
+    }
+
+    // 🧊 Ice Man — ao refletir com anéis, inicia cooldown da passiva (10s)
+    const usedIce = (hero.kit==='iceman' && (hero.iceLayers||0)>0 && (hero.iceCd||0)<=0 && hero.shield<=0 && hero.ankh<=0 && hero.wInvul<=0);
+    if(usedIce){
+      hero.iceCd = Math.max(hero.iceCd||0, 10.0);
+      effects.push({type:'hit',x:proj.x,y:proj.y,t:0,dur:0.25,color:hexToRgba('#8fdcff',0.95)});
+      SND.shield();
+    }else{
+  // Azul celeste quando a barreira que refletiu é da Emma (especialmente em diamante/ULT)
+  const emmaBlue = hexToRgba('#bfe9ff', 0.95); // tom azul-celeste
+  const col = (hero.kit==='emma' || (hero.emDiamond||0)>0) ? emmaBlue : 'rgba(255,215,0,0.95)';
+  effects.push({ type:'hit', x:proj.x, y:proj.y, t:0, dur:0.25, color: col });
+}
+
+  }
+
+  function projectileColor(owner, fallback='rgba(200,220,255,0.9)'){
+    if(!owner) return fallback;
+    return owner.color || hexToRgba(owner.hex||'#ffffff',0.95);
+  }
+
+  // Orbes/bolts/waves + 🧊 gelo (sem Raios Gama) + ⏸ stasis (Emma ULT)
+  function explodeOrb(p, hit=false, foe=null){
+    const boomColor = p.visualCaster ? projectileColor(p.visualCaster) : (p.caster ? projectileColor(p.caster) : null);
+    spawnExplosion(p.x, p.y, boomColor);
+    if(hit && foe){
+      const dx=foe.x-p.x, dy=foe.y-p.y; const d=Math.max(1,Math.hypot(dx,dy)); const k=0.35;
+      damage(foe,18,{x:dx/d*k,y:dy/d*k}, p.caster?.id || null);
+    }
+  }
+
+  // Gravidade dos ALVOS durante ULT do Magneto (atrai projéteis)
+  function applyMagnetoTargetGravity(obj, dt){
+    if(!magUlts.length) return;
+    const Gm = +U.magUltG.value || 0;
+    const R  = +U.magUltR.value || 0;
+    if(Gm<=0 || R<=0) return;
+
+    const fall = +U.falloff.value || 2.0;
+    const soft = 18;
+    for(const m of magUlts){
+      const caster = m.caster;
+      for(const h of heroes){
+        if(!h.alive || h.id===caster.id) continue; // apenas adversários
+        const dx = h.x - obj.x, dy = h.y - obj.y;
+        const dist = Math.hypot(dx,dy);
+        if(dist>0 && dist<R){
+          const acc = Gm / (Math.pow(dist,fall)+soft);
+          obj.vx += (dx/dist)*acc*dt;
+          obj.vy += (dy/dist)*acc*dt;
+        }
+      }
+    }
+  }
+
+  // 🧊 Verifica se (x,y) está dentro de alguma zona de gelo ativa
+  function isInsideIceZone(x,y){
+    const now=performance.now();
+    for(const z of iceZones){
+      if(now>z.until) continue;
+      const d=Math.hypot(x-z.x,y-z.y);
+      if(d<=z.r) return z;
+    }
+    return null;
+  }
+
+  function updateProjectiles(dt){
+    const infl=+U.influence.value, fall=+U.falloff.value, Gg=+U.gravity.value, drag=+U.drag.value;
+    const now=performance.now();
+
+    
+    for(let i=timeSands.length-1;i>=0;i--){ if(now>timeSands[i].until) timeSands.splice(i,1); }
+    for(let i=fateGlyphs.length-1;i>=0;i--){ const g=fateGlyphs[i]; if(now>=g.until){ const R=120; for(const foe of heroes){ if(!foe.alive||foe.id===(g.owner&&g.owner.id)) continue; const dx=foe.x-g.x, dy=foe.y-g.y; const d=Math.hypot(dx,dy)||1; if(d<=R){ foe.vx += (dx/d)*0.6; foe.vy += (dy/d)*0.6; applySlow(foe,0.40,1.6);} } effects.push({type:'hit',x:g.x,y:g.y,t:0,dur:0.4,color:hexToRgba('#ffd400',0.95)}); SND.hit&&SND.hit(); fateGlyphs.splice(i,1);} }
+// === ICE ZONES: expiração + Shatter Nova (+ reset da passiva) ===
+    // Ao terminar a ULT do Ice Man (zona expira), explode causando 40–60 de dano
+    // e aplica slow de 90% por 1s em área média (≈ raio da zona).
+    for(let i=iceZones.length-1;i>=0;i--){
+      const z = iceZones[i];
+      if(now >= z.until){
+        // FX da "Shatter Nova"
+        effects.push({type:'boom', x:z.x, y:z.y, t:0, dur:0.6, color:hexToRgba('#8fdcff',1)});
+        SND.supernova?.();
+        // Dano + slow nos inimigos no raio da zona
+        const R = z.r || 180;
+        for(const foe of heroes){
+          if(!foe.alive) continue;
+          if(z.owner && foe.id===z.owner.id) continue;
+          const d = Math.hypot(foe.x - z.x, foe.y - z.y);
+          if(d <= R){
+            const amt = 40 + Math.floor(Math.random()*21); // 40–60
+            const nx = (foe.x - z.x) / Math.max(1e-6, d);
+            const ny = (foe.y - z.y) / Math.max(1e-6, d);
+            damage(foe, amt, {x:nx*1.2, y:ny*1.2}, z.owner?.id || null);
+            applySlow(foe, 0.90, 1.0);
+          }
+        }
+        // Reset da passiva (anéis) após a ULT
+        if(z.owner){ z.owner.iceCd = 0; }
+        // Remove a zona
+        iceZones.splice(i,1);
+      }
+    }
+
+    // 🔥 FÊNIX — detectar casters com ULT ativa
+    const phoenixUlting = heroes.filter(h => h.kit==='phoenix' && h.alive && now < (h._phoUltUntil||0));
+
+    // Orbes
+    for(let i=projectiles.length-1;i>=0;i--){
+      const p=projectiles[i]; const px=p.x, py=p.y;
+
+      // ⏸ Emma stasis?
+      if(p.stasisUntil && now<p.stasisUntil){
+        // parados e inofensivos
+        continue;
+      }
+
+      // 🧊 congelado?
+      if(p.frozenUntil && now<p.frozenUntil){
+        // colisão com heróis que tocam o projétil congelado
+        for(const h of heroes){
+          if(!h.alive) continue;
+          if(p.iceOwner && h.id!==p.iceOwner.id){ // inimigos do Ice Man
+            const d=Math.hypot(h.x-p.x,h.y-p.y);
+            if(d <= (h.r + (p.r||3) + 2)){
+              // dano pesado + slow 90% por 1s
+              damage(h, 42, {x:(h.x-p.x)/(d||1)*0.6, y:(h.y-p.y)/(d||1)*0.6}, p.iceOwner.id);
+              applySlow(h, 0.90, 1.0);
+              explodeOrb(p,true,h);
+              projectiles.splice(i,1);
+              continue;
+            }
+          }
+        }
+        continue; // fica parado
+      }
+
+      // Estrelas (gravidade & swirl)
+      if(Gg>0 && stars.length){
+        let ax=0, ay=0; const baseSwirl=clamp(+U.orbSwirl.value||0,0,1);
+        for(const s of stars){
+          const dx=s.x-p.x, dy=s.y-p.y; const dist=Math.hypot(dx,dy);
+          if(dist>1e-3 && dist<infl){
+            const rx=dx/dist, ry=dy/dist, tx=-ry, ty=rx;
+            const soft=25; const G=Gg*s.massScale; const base=G/(Math.pow(dist,fall)+soft);
+            const clos=clamp(1-(dist-s.r)/Math.max(1,(infl-s.r)),0,1);
+            const swirlLocal=clamp((0.05+0.90*baseSwirl)*(0.75+0.25*clos),0,0.98);
+            ax += (rx*(1-swirlLocal)+tx*swirlLocal)*base;
+            ay += (ry*(1-swirlLocal)+ty*swirlLocal)*base;
+          }
+        }
+        p.vx += ax*dt; p.vy += ay*dt;
+      }
+
+      applyMagnetoTargetGravity(p, dt);
+
+      // Magneto roaming: homing leve
+      if(p.caster && p.caster.kit==='magneto' && now < (p.caster.magnetoRoamUntil||0)){
+        const foe = nearestEnemyOf(p.caster);
+        if(foe) steerTowards(p, foe.x, foe.y, 0.92);
+      }
+
+      if(drag>0){ p.vx*=(1-drag*dt*60*0.5); p.vy*=(1-drag*dt*60*0.5); }
+      const vmax=8.0; const sp=Math.hypot(p.vx,p.vy); if(sp>vmax){ const f=vmax/sp; p.vx*=f; p.vy*=f; }
+      const tMul = inAnyTimeSand(p.x,p.y) ? 0.40 : 1.0;
+      p.x+=p.vx*dt*60*tMul; p.y+=p.vy*dt*60*tMul; p.ttl-=dt;
+
+      // 🔥 Campo da Fênix — rouba/atrai orbes
+      for(const ph of phoenixUlting){
+        const R = ph._phoUltR || 340;
+        const dx = ph.x - p.x, dy = ph.y - p.y;
+        const dist = Math.hypot(dx,dy);
+        if(dist <= R){
+          // projétil passa a ser da Fênix
+          p.caster = ph;
+          p.visualCaster = ph;
+          // atrai
+          steerTowards(p, ph.x, ph.y, 0.92);
+          // relança quando próximo
+          if(dist <= 24){
+            const foe = nearestEnemyOf(ph);
+            if(foe){
+              const spd = (+U.boltSpeed.value||12) * (ph.boltMul||1);
+              const ang = Math.atan2(foe.y - ph.y, foe.x - ph.x) + (Math.random()*2-1)*0.12;
+              p.vx = Math.cos(ang)*spd;
+              p.vy = Math.sin(ang)*spd;
+              p.x  = ph.x + Math.cos(ang)*(ph.r + 6);
+              p.y  = ph.y + Math.sin(ang)*(ph.r + 6);
+            }
+          }
+        }
+      }
+
+      // 🧊 Zona de gelo: congelar projétil
+      const z = isInsideIceZone(p.x,p.y);
+      if(z){
+        // Cura por controle: 20–30 HP ao congelar um projétil
+        if(z.owner){
+          const heal = 20 + Math.floor(Math.random()*11); // 20–30
+          z.owner.hp = Math.min(z.owner.maxHp, z.owner.hp + heal);
+          // Bônus de +1 anel por congelar projétil (dura 3s)
+          z.owner._iceFreezeBonusUntil = Math.max(z.owner._iceFreezeBonusUntil||0, now + 3000);
+        }
+        p.frozenUntil = Math.min(z.until, now+2600); // segurança
+        p.vx = 0; p.vy = 0;
+        p.iceOwner = z.owner || null;
+        p.visualCaster = z.owner || p.visualCaster;
+        // orbe passa a ser do Ice Man
+        if(z.owner) p.caster = z.owner;
+        continue;
+      }
+
+      // barreiras
+      let bounced=false;
+      for(const h of enemiesOf(p.caster?.id||'')){
+        if(!h.alive) continue;
+        let barrier = barrierActive(h);
+        // Emma ignora apenas o ESCUDO padrão; Ankh/wInvul continuam ativos
+        if (barrier && p.caster?.kit==='emma' && h.shield>0 && h.ankh<=0 && h.wInvul<=0) {
+          barrier = false;
+        }
+        if(!barrier) continue;
+        if(lineHitsBarrier(px,py,p.x,p.y,h)){ reboundProjectile(p,px,py,h); bounced=true; break; }
+      }
+
+      if(bounced){ continue; }
+
+      if(p.ttl<=0){ explodeOrb(p); projectiles.splice(i,1); continue; }
+
+      for(const foe of enemiesOf(p.caster?.id||'')){
+        if(!foe.alive) continue;
+        const dx=foe.x-p.x, dy=foe.y-p.y; if(Math.hypot(dx,dy) < foe.r + p.r){ explodeOrb(p,true,foe); projectiles.splice(i,1); break; }
+      }
+    }
+
+    // Bolts
+    for(let i=bolts.length-1;i>=0;i--){
+      const b=bolts[i]; const px=b.x,py=b.y;
+
+      // ⏸ Emma stasis?
+      if(b.stasisUntil && now<b.stasisUntil){
+        // parado; mantém trilha
+        b.path.push({x:b.x,y:b.y}); if(b.path.length>90) b.path.shift();
+        continue;
+      }
+
+      // 🧊 congelado?
+      if(b.frozenUntil && now<b.frozenUntil){
+        // toque de inimigos → dano pesado + slow curto
+        for(const h of heroes){
+          if(!h.alive) continue;
+          if(b.iceOwner && h.id!==b.iceOwner.id){
+            const d=distPointToSegment(h.x,h.y,px,py,b.x,b.y); // pequeno segmento (fica parado)
+            if(d <= h.r + (b.w*0.5||2)){
+              damage(h, 36, {x:0,y:0}, b.iceOwner.id);
+              applySlow(h, 0.90, 1.0);
+              effects.push({type:'hit',x:b.x,y:b.y,t:0,dur:0.3,color:hexToRgba('#8fdcff',0.95)});
+              bolts.splice(i,1);
+              continue;
+            }
+          }
+        }
+        continue;
+      }
+
+      if(Gg>0 && stars.length){
+        let ax=0, ay=0;
+        for(const s of stars){
+          const dx=s.x-b.x, dy=s.y-b.y; const dist=Math.hypot(dx,dy);
+          if(dist>1e-3 && dist<infl){
+            const soft=22; const G=Gg*s.massScale; const a=G/(Math.pow(dist,fall)+soft);
+            ax+=(dx/dist)*a; ay+=(dy/dist)*a;
+          }
+        }
+        b.vx+=ax*dt; b.vy+=ay*dt;
+      }
+
+      applyMagnetoTargetGravity(b, dt);
+
+      if(b.caster && b.caster.kit==='magneto' && now < (b.caster.magnetoRoamUntil||0)){
+        const foe = nearestEnemyOf(b.caster);
+        if(foe) steerTowards(b, foe.x, foe.y, 0.93);
+      }
+
+      if(drag>0){ b.vx*=(1-drag*dt*60*0.25); b.vy*=(1-drag*dt*60*0.25); }
+      const baseSpeed=(+U.boltSpeed.value||12);
+      const vmax=b.ult?baseSpeed*(1.8):(Math.max(baseSpeed, baseSpeed*1.5));
+      const sp=Math.hypot(b.vx,b.vy); if(sp>vmax){ const f=vmax/sp; b.vx*=f; b.vy*=f; }
+
+      const tMulB = inAnyTimeSand(b.x,b.y) ? 0.40 : 1.0;
+      b.x+=b.vx*dt*60*tMulB; b.y+=b.vy*dt*60*tMulB; b.ttl-=dt;
+      b.path.push({ x: b.x, y: b.y }); if(b.path.length>90) b.path.shift();
+
+      // 🔥 Campo da Fênix — rouba/atrai bolts
+      for(const ph of phoenixUlting){
+        const R = ph._phoUltR || 340;
+        const dx = ph.x - b.x, dy = ph.y - b.y;
+        const dist = Math.hypot(dx,dy);
+        if(dist <= R){
+          b.caster = ph;
+          b.visualCaster = ph;
+          steerTowards(b, ph.x, ph.y, 0.93);
+          if(dist <= 24){
+            const foe = nearestEnemyOf(ph);
+            if(foe){
+              const spd = (+U.boltSpeed.value||12) * (ph.boltMul||1);
+              const ang = Math.atan2(foe.y - ph.y, foe.x - ph.x) + (Math.random()*2-1)*0.12;
+              b.vx = Math.cos(ang)*spd;
+              b.vy = Math.sin(ang)*spd;
+              b.x  = ph.x + Math.cos(ang)*(ph.r + 6);
+              b.y  = ph.y + Math.sin(ang)*(ph.r + 6);
+            }
+          }
+        }
+      }
+
+      // 🧊 Zona de gelo: congelar bolt
+      const z2 = isInsideIceZone(b.x, b.y);
+      if (z2) {
+        // Cura por controle: 20–30 HP ao congelar um projétil
+        if(z2.owner){
+          const heal = 20 + Math.floor(Math.random()*11); // 20–30
+          z2.owner.hp = Math.min(z2.owner.maxHp, z2.owner.hp + heal);
+          // Bônus de +1 anel por congelar projétil (dura 3s)
+          z2.owner._iceFreezeBonusUntil = Math.max(z2.owner._iceFreezeBonusUntil||0, now + 3000);
+        }
+        b.frozenUntil = Math.min(z2.until, now + 2600);
+        b.vx = 0; b.vy = 0;
+        b.iceOwner = z2.owner || null;
+        b.visualCaster = z2.owner || b.visualCaster;
+        // não muda caster de bolt (mas visual sim)
+        continue;
+      }
+
+      // barreiras
+      let bounced = false;
+      for (const h of enemiesOf(b.caster?.id || '')) {
+        if (!h.alive) continue;
+        let barrier = barrierActive(h);
+        if (barrier && b.caster?.kit==='emma' && h.shield>0 && h.ankh<=0 && h.wInvul<=0) {
+          barrier = false;
+        }
+        if (!barrier) continue;
+        if (lineHitsBarrier(px, py, b.x, b.y, h)) { reboundProjectile(b, px, py, h); bounced = true; break; }
+      }
+
+      if (bounced) { continue; }
+
+      // dano em heróis
+      let hit = false;
+      for (const foe of enemiesOf(b.caster?.id || '')) {
+        if (!foe.alive) continue;
+        const dx = foe.x - b.x, dy = foe.y - b.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < foe.r + b.w * 0.8) {
+          const ratio = (+U.boltDmg.value || 0);
+          let dmg;
+          if (b.ult && b.lethal) dmg = foe.maxHp * 10;
+          else if (ratio >= 0.999) dmg = foe.maxHp * 10;
+          else dmg = foe.maxHp * Math.max(0, Math.min(1, ratio));
+          const nx = dist > 0 ? (dx / dist) : 0, ny = dist > 0 ? (dy / dist) : 0;
+          damage(foe, dmg, { x: nx * 0.10, y: ny * 0.10 }, b.caster?.id || null);
+          hit = true; break;
+        }
+      }
+      if (hit) { bolts.splice(i, 1); continue; }
+
+      const WW = WW_get(), WH = WH_get();
+      if (b.ttl <= 0 || b.x < -200 || b.y < -200 || b.x > WW + 200 || b.y > WH + 200) { bolts.splice(i, 1); continue; }
+    }
+
+    // Ondas
+    for (let i = waves.length - 1; i >= 0; i--) {
+      const w = waves[i]; w.t += dt; w.r += (w.max / w.dur) * dt; if (w.t >= w.dur) { waves.splice(i, 1); continue; }
+      // Ice Man pulse: freeze projectiles/bolts on ring contact
+      if (w.ice) {
+        const nowF = performance.now();
+        const inner = w.r - w.w;
+        const outer = w.r + w.w;
+        for (const p of projectiles) {
+          const d = Math.hypot(p.x - w.x, p.y - w.y);
+          if (d >= inner && d <= outer) {
+            p.frozenUntil = Math.max(p.frozenUntil || 0, nowF + 1600);
+            p.vx = 0; p.vy = 0;
+            p.iceOwner = w.caster || p.iceOwner || null;
+            p.visualCaster = p.visualCaster || w.caster || null;
+          }
+        }
+        for (const b of bolts) {
+          const d = Math.hypot(b.x - w.x, b.y - w.y);
+          if (d >= inner && d <= outer) {
+            b.frozenUntil = Math.max(b.frozenUntil || 0, nowF + 1600);
+            b.vx = 0; b.vy = 0;
+            b.iceOwner = w.caster || b.iceOwner || null;
+            b.visualCaster = b.visualCaster || w.caster || null;
+          }
+        }
+      }
+      for (const h of heroes) {
+        if (!h.alive) continue;
+        const d = Math.hypot(h.x - w.x, h.y - w.y);
+        if (d > w.r - w.w && d < w.r + w.w && !(w.hitSet.has(h))) {
+          const dir = { x: (h.x - w.x) / d, y: (h.y - w.y) / d };
+          if (!w.caster) {
+            if (!isInvulnerable(h)) damage(h, 60, { x: dir.x * 1.5, y: dir.y * 1.5 }, null);
+          } else if (h.id !== w.caster.id) {
+            if (!isInvulnerable(h)) damage(h, 12, { x: dir.x * 0.9, y: dir.y * 0.9 }, w.caster?.id || null);
+          }
+            if (w.ice) { applySlow(h, 0.90, 2.0); } // slow leve extra de ondas de gelo
+          w.hitSet.add(h);
+        }
+      }
+    }
+
+    // Efeitos (hit/boom/blink)
+    for (let i = effects.length - 1; i >= 0; i--) { const e = effects[i]; e.t += dt; if (e.t >= e.dur) effects.splice(i, 1); }
+
+    // Supernovas aleatórias
+    const snRate = +U.supernovaRate.value;
+    if (snRate > 0) { const p = snRate * 0.25 * dt; if (Math.random() < p) triggerSupernova(); }
+  }
+
+  function triggerSupernova() {
+    if (!stars.length) return;
+    const s = stars[Math.floor(Math.random() * stars.length)];
+    waves.push({ x: s.x, y: s.y, r: 8, max: 320 + Math.random() * 260, w: 14, t: 0, dur: 0.9, caster: null, isSuper: true, hitSet: new Set() });
+    effects.push({ type: 'boom', x: s.x, y: s.y, t: 0, dur: 0.9, color: 'rgba(255,220,180,1)' }); SND.supernova?.();
+    if (s.type === 'supergiant' && Math.random() < 0.5) { s.type = 'neutron'; s.r = Math.max(8, s.r * 0.4); s.massScale = STAR_TYPES.neutron.massScale; }
+  }
+
+  // Desenho projéteis/efeitos + campos/ilusões + 🧊 zonas + ⏸ stasis (Emma)
+  function drawProjectiles() {
+    withCamera(() => {
+      // 🧊 Zonas de Gelo
+      const now = performance.now();
+      for (let i = iceZones.length - 1; i >= 0; i--) {
+        const z = iceZones[i];
+        if (now >= z.until) { iceZones.splice(i, 1); continue; }
+        const k = (now - z.t0) / (z.until - z.t0 + 1e-6);
+        const base = '#8fdcff';
+        const puls = 1 + 0.04 * Math.sin(now / 140 + z.pulsate);
+        const r = z.r * puls;
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = hexToRgba(base, 0.85 * (1 - 0.15 * k));
+        ctx.beginPath(); ctx.arc(z.x, z.y, r, 0, Math.PI * 2 - 1e-4); ctx.stroke();
+        ctx.globalAlpha = 0.12 * (1 - 0.2 * k);
+        fillCircle(z.x, z.y, r * 0.98, hexToRgba(base, 0.20 * (1 - 0.2 * k)));
+        ctx.globalAlpha = 1;
+      }
+
+      // Orbes
+      for (const p of projectiles) {
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2 - 1e-4);
+        const owner = p.visualCaster ?? p.caster;
+        let col = projectileColor(owner, 'rgba(200,220,255,0.9)');
+        if (p.frozenUntil && performance.now() < p.frozenUntil) col = hexToRgba('#bfe8ff', 0.95);
+        if (p.stasisUntil && performance.now() < p.stasisUntil) col = hexToRgba('#e0f7ff', 0.85);
+        ctx.fillStyle = col; ctx.shadowBlur = 10; ctx.shadowColor = col; ctx.fill(); ctx.shadowBlur = 0;
+      }
+
+      // Ondas
+      for (const w of waves) {
+        const owner = w.caster || null;
+        const col = w.ice ? 'rgba(143,220,255,0.95)'
+          : owner ? projectileColor(owner, 'rgba(180,220,255,0.7)')
+            : (w.isSuper ? 'rgba(255,210,150,0.95)' : 'rgba(180,220,255,0.7)');
+        ctx.lineWidth = w.w; ctx.strokeStyle = col; ctx.beginPath(); ctx.arc(w.x, w.y, w.r, 0, Math.PI * 2 - 1e-4); ctx.stroke();
+      }
+
+      // Bolts
+      for (const b of bolts) {
+        const path = b.path; if (path && path.length > 1) {
+          const owner = (b.visualCaster ?? b.caster);
+          let col = projectileColor(owner, 'rgba(255,255,255,0.9)');
+          if (b.frozenUntil && performance.now() < b.frozenUntil) col = hexToRgba('#d8f2ff', 0.95);
+          if (b.stasisUntil && performance.now() < b.stasisUntil) col = hexToRgba('#e0f7ff', 0.85);
+          ctx.globalAlpha = 0.9; ctx.strokeStyle = col; ctx.lineWidth = b.ult ? 3.3 : 2.6; ctx.lineJoin = 'round';
+          ctx.beginPath(); ctx.moveTo(path[0].x, path[0].y); for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y); ctx.stroke(); ctx.globalAlpha = 1;
+        }
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.ult ? 4.2 : 3.7, 0, Math.PI * 2 - 1e-4);
+        const owner2 = b.visualCaster ?? b.caster;
+        let col2 = projectileColor(owner2, 'rgba(255,255,255,0.95)');
+        if (b.frozenUntil && performance.now() < b.frozenUntil) col2 = hexToRgba('#d8f2ff', 0.95);
+        if (b.stasisUntil && performance.now() < b.stasisUntil) col2 = hexToRgba('#e0f7ff', 0.85);
+        ctx.fillStyle = col2; ctx.shadowBlur = 18; ctx.shadowColor = ctx.fillStyle; ctx.fill(); ctx.shadowBlur = 0;
+      }
+
+      // Efeitos
+      for (const e of effects) {
+        if (e.type === 'boom') {
+          const prog = e.t / e.dur; const r = 10 + prog * 40; const a = 1 - Math.pow(prog, 1.4); const base = e.color || 'rgba(255,220,180,1)';
+          ctx.fillStyle = base.replace('1)', `${0.25 * a})`).replace('0.95)', '0.25)');
+          ctx.beginPath(); ctx.arc(e.x, e.y, r * 2, 0, Math.PI * 2 - 1e-4); ctx.fill();
+          ctx.strokeStyle = base.replace('1)', `${0.9 * a})`).replace('0.95)', '0.9)'); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, Math.PI * 2 - 1e-4); ctx.stroke();
+        } else if (e.type === 'hit') {
+          const prog = e.t / e.dur; const a = 1 - prog; const base = e.color || 'rgba(255,255,255,0.9)';
+          ctx.fillStyle = base; ctx.beginPath(); ctx.arc(e.x, e.y, 2 + 8 * prog, 0, Math.PI * 2 - 1e-4); ctx.globalAlpha = 0.7 * a; ctx.fill(); ctx.globalAlpha = 1;
+        } else if (e.type === 'blink') {
+          const prog = e.t / e.dur; const a = 1 - prog;
+          strokeHalo(e.x0, e.y0, 10 + 30 * prog, 2, hexToRgba('#00c853', 0.85 * a));
+          strokeHalo(e.x1, e.y1, 10 + 30 * prog, 2, hexToRgba('#00c853', 0.85 * a));
+          ctx.save(); ctx.globalAlpha = 0.85 * a; ctx.strokeStyle = hexToRgba('#00c853', 0.95 * a); ctx.lineWidth = 2.2;
+          ctx.beginPath();
+          ctx.moveTo(e.x0, e.y0);
+          const mx = (e.x0 + e.x1) / 2, my = (e.y0 + e.y1) / 2;
+          const nx = -(e.y1 - e.y0), ny = (e.x1 - e.x0);
+          const k = 0.15;
+          ctx.quadraticCurveTo(mx + nx * k, my + ny * k, e.x1, e.y1);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    });
+  }
+
+  // ===== UI / Teclas =====
+  const keys = { shift: false, space: false };
+  addEventListener('keydown', e => {
+    const k = (e.key || '').toLowerCase();
+    if (k === 'shift') keys.shift = true;
+    if (k === ' ') keys.space = true;
+  });
+  addEventListener('keyup', e => {
+    const k = (e.key || '').toLowerCase();
+    if (k === 'shift') keys.shift = false;
+    if (k === ' ') keys.space = false;
+  });
+
+  U.randomize.onclick = seedVelocities;
+  U.reset.onclick = () => {
+    // ✅ não zera cooldowns globais (mantém em cada herói)
+    for (const h of heroes) { Object.assign(h, makeHero(h.id)); }
+    scores.A = 0; scores.B = 0; updateScores();
+    effects.length = projectiles.length = bolts.length = waves.length = iceZones.length = 0;
+    // (sem gamas)
+    magUlts.length = 0; illusions.length = 0;
+  };
+  U.resetBattle.onclick = U.reset.onclick;
+
+  let paused = false;
+  U.pause.onclick = () => { paused = !paused; U.pause.textContent = paused ? 'Retomar' : 'Pausar'; };
+  U.zeroV.onclick = () => { for (const h of heroes) { h.vx = 0; h.vy = 0; } };
+
+  U.addHeroA.onclick = () => addHero('A');
+  U.addHeroB.onclick = () => addHero('B');
+
+  addEventListener('cosmo:ultA', () => { const h = heroesOf('A')[0]; if (h) heroUltimate(h); });
+  addEventListener('cosmo:ultB', () => { const h = heroesOf('B')[0]; if (h) heroUltimate(h); });
+
+  // ===== Loop =====
+  let last = performance.now();
+  let fpsAcc = 0, fpsCount = 0, fpsLast = performance.now();
+  let dtGlobal = 0;
+
+  function drawMagnetoFields() {
+    const now = performance.now(); purgeMagUlts(now);
+    withCamera(() => {
+      for (const m of magUlts) {
+        const h = m.caster; if (!h.alive) continue;
+        const alpha = 0.20 + 0.15 * Math.sin(now / 200);
+        const r = 78 + 8 * Math.sin(now / 140);
+        ctx.lineWidth = 2.4;
+        ctx.strokeStyle = hexToRgba(h.hex, 0.75);
+        ctx.beginPath(); ctx.arc(h.x, h.y, r, 0, Math.PI * 2 - 1e-4); ctx.stroke();
+        ctx.globalAlpha = 0.12 + alpha * 0.5;
+        fillCircle(h.x, h.y, r * 0.95, hexToRgba(h.hex, 0.12));
+        ctx.globalAlpha = 1;
+      }
+    });
+  }
+
+  function frame(t) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(0.06, (t - last) / 1000); last = t;
+    dtGlobal = dt;
+    if (paused) return;
+
+    drawBackground();
+    for (const h of heroes) tryRespawn(h);
+    for (const h of heroes) stepHero(h, dt);
+    for (const h of heroes) aiTryCast(h, dt);
+
+    updateIllusions(dt);
+    updateProjectiles(dt);
+
+    drawStarfield();
+    for (const s of stars) drawStar(s);
+    drawProjectiles();
+    drawMagnetoFields();
+    drawIllusions();
+    for (const h of heroes) drawHero(h);
+
+    const inst = 1 / Math.max(0.001, dt); fpsAcc += inst; fpsCount++; if (t - fpsLast > 400) { U.fps.textContent = `${Math.round(fpsAcc / fpsCount)} fps`; fpsAcc = 0; fpsCount = 0; fpsLast = t; }
+  }
+  requestAnimationFrame(frame);
+
+  // ===== Exposição para a Parte 4 =====
+  window.__COSMO_GAME__ = {
+    heroes, stars, projectiles, bolts, waves, effects, iceZones,
+    WW: () => WW_get(),
+    WH: () => WH_get(),
+    damage, kill, spawnExplosion, spawnHit,
+    barrierActive, barrierRadius,
+    hexToRgba, clamp, unit, len2, SND,
+    setUltimate: (heroKey, fn) => { ULT[heroKey] = fn; },
+    getUltimate: (heroKey) => ULT[heroKey],
+    getBoltSpeedFor: (h) => ((+U.boltSpeed.value || 12) * (h.boltMul || 1)),
+    addProjectile: (obj) => { projectiles.push(obj); },
+    addBolt: (obj) => { bolts.push(obj); },
+    addWave: (obj) => { waves.push(obj); },
+
+    // campos de força / ult
+    addMagnetoField
+  };
+
+})(); // fim Parte 3/4
+// ========= KILL/RESPAWN GENÉRICO (A,B,C,D) & FIM DE ROUND =========
+function heroDied(id){
+  Round.markAlive(id, false);
+  const mode = (U.gameMode && U.gameMode.value) || '2v2';
+  if(mode==='1v1'){
+    const winner = (id==='A') ? 'R' : 'L';
+    Round.addPoint(winner);
+    setTimeout(()=>{ respawnPlayer('A'); respawnPlayer('B'); }, 900);
+    return;
+  }
+  if (Round.teamWiped(Round.teamL)){
+    Round.addPoint('R');
+    setTimeout(()=>{ ['A','B','C','D'].forEach(pid=>respawnPlayer(pid)); }, 1100);
+    return;
+  }
+  if (Round.teamWiped(Round.teamR)){
+    Round.addPoint('L');
+    setTimeout(()=>{ ['A','B','C','D'].forEach(pid=>respawnPlayer(pid)); }, 1100);
+    return;
+  }
+  setTimeout(()=>{ respawnPlayer(id); }, 1400);
+}
+</script>
+<script>
+/* =========================================================
+   COSMOS — ULT do MAGNETO (Parte 4/5)
+   O placeholder da Parte 3 é substituído por uma versão completa:
+
+   • Campo Magnético real:
+     - Cria um campo por ~2.3s (visual já desenhado na Parte 3).
+     - Paralisa projéteis inimigos próximos, captura-os e
+       relança em direção ao inimigo mais próximo, creditando o Magneto.
+     - Boost de homing no Magneto (já suportado pela Parte 3).
+     - Breve invulnerabilidade para iniciar a jogada.
+
+   • Choque de metal:
+     - Após a captura, o Magneto lança uma "rajada" extra de bolts radiais.
+
+   Observação: a gravidade de projéteis durante o campo continua
+   sendo controlada pelas opções da UI (magUltG/magUltR) na Parte 3.
+   ========================================================= */
+(() => {
+  const CORE = window.__COSMO_CORE__;
+  const GAME = window.__COSMO_GAME__;
+  const CFG  = window.__COSMO_CFG__;
+  if (!CORE || !GAME || !CFG) {
+    console.error('[Parte 4/5] Dependências ausentes (__COSMO_CORE__/__COSMO_GAME__/__COSMO_CFG__).');
+    return;
+  }
+
+  const { SND } = CORE;
+  const { heroes, addWave, addBolt, addMagnetoField, hexToRgba, getBoltSpeedFor } = GAME;
+  const { U } = CFG;
+
+  function nearestEnemyOfLocal(hero){
+    let best=null, bd=Infinity;
+    for(const foe of heroes){ if(!foe.alive) continue; if(foe.id===hero.id) continue;
+      const d = (foe.x-hero.x)**2 + (foe.y-hero.y)**2;
+      if(d<bd){ bd=d; best=foe; }
+    }
+    return best;
+  }
+
+  function flingVector(fromX, fromY, target, minSpeed, spread=0){
+    if(!target){ return {vx:minSpeed, vy:0}; }
+    const dx = target.x - fromX, dy = target.y - fromY;
+    let ang = Math.atan2(dy, dx);
+    if(spread>0){ ang += (Math.random()*2-1) * spread; }
+    const vx = Math.cos(ang) * minSpeed;
+    const vy = Math.sin(ang) * minSpeed;
+    return {vx, vy};
+  }
+
+  function magnetoUltimateReal(h){
+    if(!h || !h.alive) return;
+
+    const now = performance.now();
+    const DUR_FIELD   = 2300;   // duração do campo
+    const R_CAPTURE   = 240;    // raio para capturar projéteis
+    const FREEZE_TIME = 560;    // tempo de "estase" antes de relançar
+    const INVUL_START = 1.2;    // invuln pra iniciar a jogada
+    const BURST_BOLTS = 18;     // bolts extras no choque
+    const BURST_SPREAD= Math.PI*2;
+
+    // FX – pulso inicial + campo
+    addWave({ x:h.x, y:h.y, r:12, max:200, w:10, t:0, dur:0.45, caster:h, hitSet:new Set(), isSuper:false });
+    SND.zap?.();
+    addMagnetoField(h, DUR_FIELD);
+
+    // invulnerável no start
+    h.wInvul = Math.max(h.wInvul||0, INVUL_START);
+
+    // homing mais agressivo enquanto ult está ativa (já suportado na Parte 3)
+    h.magnetoRoamUntil = Math.max(h.magnetoRoamUntil||0, now + DUR_FIELD + 300);
+
+    // ===== Captura de projéteis =====
+    const captured = { orbs:[], bolts:[] };
+    const allOrbs  = (GAME.projectiles||[]);
+    const allBolts = (GAME.bolts||[]);
+
+    // marca e paralisa inimigos no raio
+    for(const p of allOrbs){
+      if(!p || !p.caster || p.caster.id===h.id) continue;
+      const d = Math.hypot(p.x-h.x, p.y-h.y);
+      if(d<=R_CAPTURE){
+        p.stasisUntil = now + FREEZE_TIME;
+        p.vx=0; p.vy=0;
+        p._magGrab = h; // marcador local
+        captured.orbs.push(p);
+      }
+    }
+    for(const b of allBolts){
+      if(!b || !b.caster || b.caster.id===h.id) continue;
+      const d = Math.hypot(b.x-h.x, b.y-h.y);
+      if(d<=R_CAPTURE){
+        b.stasisUntil = now + FREEZE_TIME;
+        b.vx=0; b.vy=0;
+        b._magGrab = h; // marcador local
+        captured.bolts.push(b);
+      }
+    }
+
+    // ===== Relançamento após "estase" =====
+    setTimeout(() => {
+      if(!h.alive) return;
+
+      const tgt = nearestEnemyOfLocal(h);
+      const speedBase = getBoltSpeedFor(h);
+
+      // Re-empodera ORBES capturados
+      for(const p of captured.orbs){
+        if(!p || p._magGrab!==h) continue;
+        // passa a pertencer ao Magneto
+        p.caster = h; p.visualCaster = h;
+        const {vx, vy} = flingVector(p.x, p.y, tgt, Math.max(6.5, speedBase*0.65), Math.PI/16);
+        p.vx = vx; p.vy = vy;
+        p.stasisUntil = 0; p.frozenUntil = 0;
+        p.ttl = Math.max(1.5, p.ttl||1.5);
+      }
+
+      // Re-empodera BOLTS capturados
+      for(const b of captured.bolts){
+        if(!b || b._magGrab!==h) continue;
+        b.caster = h; b.visualCaster = h;
+        const {vx, vy} = flingVector(b.x, b.y, tgt, Math.max(speedBase*1.05, 13.5), Math.PI/18);
+        b.vx = vx; b.vy = vy;
+        b.stasisUntil = 0; b.frozenUntil = 0;
+        b.ttl = Math.max(1.6, b.ttl||1.6);
+        b.lethal = b.lethal || false; // mantém flag se já era letal
+      }
+
+      // Pequeno burst radial de "metal" (bolts do Magneto)
+      const n = BURST_BOLTS;
+      const sp = Math.max(speedBase*1.05, 13);
+      for(let i=0;i<n;i++){
+        const a = (i/n)*BURST_SPREAD;
+        const vx = Math.cos(a)*sp, vy=Math.sin(a)*sp;
+        addBolt({
+          x:h.x, y:h.y, vx, vy,
+          w:3.4, ttl:2.2,
+          caster:h, visualCaster:h, path:[], ult:true, lethal:false
+        });
+      }
+      SND.zap?.();
+    }, FREEZE_TIME);
+
+    // recarga
+    h.ultCD = h.ultMax;
+  }
+
+  // Substitui o placeholder da Parte 3
+  GAME.setUltimate('magneto', magnetoUltimateReal);
+
+  // (Opcional) mostra que o kit do Magneto está ativo no seletor, caso algo tenha falhado na Parte 1
+  try {
+    const selAdd = (sel) => {
+      if(!sel) return;
+      if([...sel.options].some(o => o.value==='magneto')) return;
+      const o = document.createElement('option');
+      o.value='magneto'; o.textContent='Magneto';
+      sel.appendChild(o);
+    };
+    selAdd(CFG.U.hHeroA); selAdd(CFG.U.hHeroB);
+  } catch(e){ /* no-op */ }
+
+})(); // fim Parte 4/5
+// ========= KILL/RESPAWN GENÉRICO (A,B,C,D) & FIM DE ROUND =========
+function heroDied(id){
+  Round.markAlive(id, false);
+  const mode = (U.gameMode && U.gameMode.value) || '2v2';
+  if(mode==='1v1'){
+    const winner = (id==='A') ? 'R' : 'L';
+    Round.addPoint(winner);
+    setTimeout(()=>{ respawnPlayer('A'); respawnPlayer('B'); }, 900);
+    return;
+  }
+  if (Round.teamWiped(Round.teamL)){
+    Round.addPoint('R');
+    setTimeout(()=>{ ['A','B','C','D'].forEach(pid=>respawnPlayer(pid)); }, 1100);
+    return;
+  }
+  if (Round.teamWiped(Round.teamR)){
+    Round.addPoint('L');
+    setTimeout(()=>{ ['A','B','C','D'].forEach(pid=>respawnPlayer(pid)); }, 1100);
+    return;
+  }
+  setTimeout(()=>{ respawnPlayer(id); }, 1400);
+}
+</script>
+<script>
+/* =========================================================
+   COSMOS — Emma Frost + Vel. de ATAQUE (bolts) por herói (Parte 5/5)
+
+   Adições:
+   • Heroína: Emma Frost (Diamante)
+     - Passiva: ao encostar em inimigo, entra em forma diamante (invulnerável por 2s),
+       causa grande dano de contato e NÃO lança projéteis nesse período.
+     - ULT: congela projéteis inimigos ao redor, teleporta para perto do alvo e ganha haste.
+
+   • UI IA: "Vel. Ataque (bolts)" por herói (A e B).
+     - Multiplica a cadência somente dos bolts daquele herói (padrão = 1.0).
+     - Implementado via ajuste dinâmico do cooldown (cd.bolt).
+
+   Integração:
+   • Sem alterar Partes anteriores: usamos wrappers/loops próprios.
+   • HERO_KITS estendido com 'emma' e options acrescentadas aos selects de heróis.
+   ========================================================= */
+(() => {
+  const CFG  = window.__COSMO_CFG__;
+  const CORE = window.__COSMO_CORE__;
+  const GAME = window.__COSMO_GAME__;
+  if (!CFG || !CORE || !GAME) {
+    console.error('[Parte 5/5] Dependências ausentes (__COSMO_CFG__/__COSMO_CORE__/__COSMO_GAME__).');
+    return;
+  }
+
+  const { U, HERO_KITS, teamCfg, THINK, hexToRgba, clamp,
+          syncCfgFromUI: _syncCfgFromUI, syncUIFromCfg: _syncUIFromCfg,
+          applyKitToUI: _applyKitToUI } = CFG;
+  const { heroes, projectiles, bolts, damage, effects, setUltimate,
+          WW: WW_get, WH: WH_get } = GAME;
+  const { SND } = CORE;
+
+  /* -----------------------------------------
+     1) HERO_KITS — acrescenta Emma Frost (se não existir)
+     ----------------------------------------- */
+  if (!HERO_KITS.emma) {
+    HERO_KITS.emma = {
+      key: 'emma',
+      name: 'Emma',
+      full: 'Emma Frost',
+      label: 'Emma Frost (Diamante)',
+      base: '#e6f3ff',
+      hp: 175,
+      speedMul: 1.08,
+      boltMul: 1.10,
+      ultCd: 20,
+      accBolt: 0.85,
+      think: THINK,
+      ultName: 'Estase Telepática'
+    };
+  }
+
+  // Acrescenta opção "Emma Frost" nos selects se não existir
+  function ensureEmmaOption(sel) {
+    if (!sel) return;
+    if ([...sel.options].some(o => o.value === 'emma')) return;
+    const o = document.createElement('option');
+    o.value = 'emma';
+    o.textContent = HERO_KITS.emma.label;
+    sel.appendChild(o);
+  }
+  ensureEmmaOption(U.hHeroA);
+  ensureEmmaOption(U.hHeroB);
+
+  /* ---------------------------------------------------------
+     2) UI IA — injeta "Vel. Ataque (bolts)" por herói (A/B)
+     --------------------------------------------------------- */
+  function injectBoltAttackSlider(id, labelText, defaultVal, anchorInputEl) {
+  const grid = U.iaPanel?.querySelector('.grid');
+  if (!grid) return null;
+
+  // evita duplicar caso o script execute mais de uma vez
+  const existing = document.getElementById(id);
+  if (existing) return existing;
+
+  const lab = document.createElement('label');
+  lab.textContent = labelText;
+  lab.setAttribute('for', id);
+
+  const inp = document.createElement('input');
+  inp.id = id;
+  inp.type = 'range';
+  inp.min = '0.5';
+  inp.max = '3.0';
+  inp.step = '0.05';
+  inp.value = String(defaultVal ?? 1.0);
+  inp.title = 'Multiplicador de cadência: 1.0 = normal, 2.0 = 2× mais rápido';
+
+  // âncora: inserimos logo após o controle "Auto-ULT" do respectivo herói
+  const anchor = anchorInputEl && anchorInputEl.parentElement === grid ? anchorInputEl : null;
+  if (anchor) {
+    grid.insertBefore(lab, anchor.nextSibling);
+    grid.insertBefore(inp, lab.nextSibling);
+  } else {
+    grid.appendChild(lab);
+    grid.appendChild(inp);
+  }
+  return inp;
+}
+
+  // Valores default
+  teamCfg.A.boltRateMul = teamCfg.A.boltRateMul || 1.0;
+  teamCfg.B.boltRateMul = teamCfg.B.boltRateMul || 1.0;
+
+  // Injeta sliders (após "Velocidade de Raios" se possível)
+  const atkA = injectBoltAttackSlider('hBoltAtkA', 'Vel. Ataque (bolts)', teamCfg.A.boltRateMul, U.hBoltSpeedA);
+  const atkB = injectBoltAttackSlider('hBoltAtkB', 'Vel. Ataque (bolts)', teamCfg.B.boltRateMul, U.hBoltSpeedB);
+
+  // Mapeia no objeto U para consistência com o resto do app
+  U.hBoltAtkA = atkA;
+  U.hBoltAtkB = atkB;
+
+  // Listeners → atualiza config e sincronia UI
+  function updateBoltRateTeam(team) {
+    const isA = (team === 'A');
+    const inp = isA ? U.hBoltAtkA : U.hBoltAtkB;
+    const v = +((inp && inp.value) || 1.0);
+    teamCfg[team].boltRateMul = clamp(v, 0.5, 3.0);
+  }
+  atkA && atkA.addEventListener('input', () => updateBoltRateTeam('A'));
+  atkB && atkB.addEventListener('input', () => updateBoltRateTeam('B'));
+
+  // Wrappers de sync para incluir o novo slider
+  CFG.syncCfgFromUI = function(team) {
+    _syncCfgFromUI(team);
+    const isA = (team === 'A');
+    const inp = isA ? U.hBoltAtkA : U.hBoltAtkB;
+    if (inp) inp.value = String(teamCfg[team].boltRateMul || 1.0);
+  };
+
+  // Wrapper do applyKit para manter defaults sensatos ao trocar herói
+  CFG.applyKitToUI = function(team, kitKey) {
+    _applyKitToUI(team, kitKey);
+    // padroniza multiplicador ao trocar de kit
+    teamCfg[team].boltRateMul = teamCfg[team].boltRateMul || 1.0;
+    CFG.syncUIFromCfg(team);
+  };
+
+  // Garante que sliders recebam o valor atual da config
+  CFG.syncUIFromCfg('A');
+  CFG.syncUIFromCfg('B');
+
+  /* ----------------------------------------------------
+     3) Cadência por herói — tick que ajusta cd.bolt
+     ---------------------------------------------------- */
+  function boltRateTick() {
+    const now = performance.now();
+    const last = boltRateTick._last || now;
+    const dt = Math.min(0.06, (now - last) / 1000);
+    boltRateTick._last = now;
+
+    for (const h of heroes) {
+      if (!h || !h.cd) continue;
+
+      // Anexa o multiplicador no estado do herói (espelha do teamCfg)
+      const mul = clamp((teamCfg[h.id]?.boltRateMul) ?? h.boltRateMul ?? 1.0, 0.5, 3.0);
+      h.boltRateMul = mul;
+
+      // Ajuste de cd (positivo = acelera; <1 = "mais lento")
+      if (typeof h.cd.bolt === 'number' && h.cd.bolt > 0) {
+        if (mul > 1) {
+          h.cd.bolt = Math.max(0, h.cd.bolt - dt * (mul - 1));
+        } else if (mul < 1) {
+          const slow = (1 / mul) - 1; // 1.0→0 | 0.5→+1
+          h.cd.bolt += dt * slow;
+        }
+      }
+    }
+    requestAnimationFrame(boltRateTick);
+  }
+  requestAnimationFrame(boltRateTick);
+
+  /* ----------------------------------------------------
+     4) Emma Frost — ULT: Estase + Teleporte + Haste (se não existir)
+     ---------------------------------------------------- */
+  function emmaUltimate(h) {
+    if (!h || !h.alive) return;
+    const now = performance.now();
+
+    const R_FREEZE = 280;   // raio de parada dos projéteis inimigos
+    const T_FREEZE = 1400;  // tempo de congelamento
+    const T_HASTE  = 5000;  // duração do haste após teleporte
+    const PAD = 6;
+
+    // Para projéteis inimigos nas proximidades
+    for (const p of (projectiles || [])) {
+      if (!p || !p.caster || p.caster.id === h.id) continue;
+      const d = Math.hypot(p.x - h.x, p.y - h.y);
+      if (d <= R_FREEZE) {
+        p.frozenUntil = Math.max(p.frozenUntil || 0, now + T_FREEZE);
+        p.vx = 0; p.vy = 0;
+      }
+    }
+    for (const b of (bolts || [])) {
+      if (!b || !b.caster || b.caster.id === h.id) continue;
+      const d = Math.hypot(b.x - h.x, b.y - h.y);
+      if (d <= R_FREEZE) {
+        b.frozenUntil = Math.max(b.frozenUntil || 0, now + T_FREEZE);
+        b.vx = 0; b.vy = 0;
+      }
+    }
+
+    // Teleporta-se para perto do inimigo mais próximo
+    let target = null, bd = Infinity;
+    for (const foe of heroes) {
+      if (!foe.alive || foe.id === h.id) continue;
+      const d2 = (foe.x - h.x) ** 2 + (foe.y - h.y) ** 2;
+      if (d2 < bd) { bd = d2; target = foe; }
+    }
+    if (target) {
+      const ang = Math.atan2(target.y - h.y, target.x - h.x);
+      const dist = 90;
+      let tx = target.x - Math.cos(ang) * dist;
+      let ty = target.y - Math.sin(ang) * dist;
+      // Limites do universo
+      tx = clamp(tx, PAD, WW_get() - PAD);
+      ty = clamp(ty, PAD, WH_get() - PAD);
+      // FX de blink
+      effects && effects.push({ type:'blink', x0:h.x, y0:h.y, x1:tx, y1:ty, t:0, dur:0.33, color: hexToRgba(h.hex, 0.95) });
+      h.x = tx; h.y = ty;
+    }
+
+    // Haste pós-teleporte
+    h.hasteUntil = now + T_HASTE;
+
+    // Som e recarga
+    SND.zap?.();
+    h.ultCD = h.ultMax;
+  }
+
+  // Registra ULT se não existir ainda (pode já estar definida na Parte 3)
+  if (!GAME.getUltimate('emma')) {
+    setUltimate('emma', emmaUltimate);
+  }
+
+  /* ------------------------------------------------------------
+     5) Emma Frost — PASSIVA: Forma Diamante por 2s no contato
+        • Ativa ao encostar em um inimigo.
+        • Inicia invulnerabilidade (usa wInvul existente) e aplica
+          grande dano imediato ao inimigo tocado.
+        • Enquanto ativa, NÃO lança projéteis (bolts/orbes são
+          bloqueados e removidos se escaparem nesse intervalo).
+     ------------------------------------------------------------ */
+  function emmaPassiveTick() {
+    const now = performance.now();
+    for (const h of heroes) {
+      if (!h.alive || h.kit !== 'emma') continue;
+
+      // Ativo?
+      const active = (h._emmaDiamondUntil && now < h._emmaDiamondUntil);
+
+      if (active) {
+        // Mantém invulnerabilidade visual/física
+        h.wInvul = Math.max(h.wInvul || 0, (h._emmaDiamondUntil - now) / 1000);
+        // Bloqueia projéteis do próprio herói
+        if (h.cd) {
+          h.cd.bolt = Math.max(h.cd.bolt || 0, 0.16);
+          h.cd.orb  = Math.max(h.cd.orb  || 0, 0.16);
+        }
+        // Remove qualquer bolt que tenha escapado
+        for (let i = bolts.length - 1; i >= 0; i--) {
+          const b = bolts[i];
+          if (b && b.caster === h) bolts.splice(i, 1);
+        }
+      } else {
+        // Checa contato com inimigo
+        let foe = null;
+        for (const o of heroes) {
+          if (!o.alive || o.id === h.id) continue;
+          const d = Math.hypot(o.x - h.x, o.y - h.y);
+          if (d <= (h.r + o.r + 0.5)) { foe = o; break; }
+        }
+
+        const ready = now >= (h._emmaNextReady || 0);
+        if (foe && ready) {
+          // Ativa diamante por 4s
+          h._emmaDiamondUntil = now + 5000;  // 4s
+          h._emmaNextReady    = now + 60;  // pequena recarga para não spammar
+
+          // Dano forte no inimigo em contato
+          const dx = foe.x - h.x, dy = foe.y - h.y;
+          const dn = Math.hypot(dx, dy) || 1;
+          const knock = { x: (dx / dn) * 0.65, y: (dy / dn) * 0.65 };
+          const bigDmg = Math.max(foe.maxHp * 0.45, 40); // ~45% da vida (mín 40)
+          damage(foe, bigDmg, knock, h.id, { pierceShield:true });
+
+          SND.shield?.();
+        }
+      }
+    }
+    requestAnimationFrame(emmaPassiveTick);
+  }
+  requestAnimationFrame(emmaPassiveTick);
+
+})();
+// ========= KILL/RESPAWN GENÉRICO (A,B,C,D) & FIM DE ROUND =========
+function heroDied(id){
+  Round.markAlive(id, false);
+  const mode = (U.gameMode && U.gameMode.value) || '2v2';
+  if(mode==='1v1'){
+    const winner = (id==='A') ? 'R' : 'L';
+    Round.addPoint(winner);
+    setTimeout(()=>{ respawnPlayer('A'); respawnPlayer('B'); }, 900);
+    return;
+  }
+  if (Round.teamWiped(Round.teamL)){
+    Round.addPoint('R');
+    setTimeout(()=>{ ['A','B','C','D'].forEach(pid=>respawnPlayer(pid)); }, 1100);
+    return;
+  }
+  if (Round.teamWiped(Round.teamR)){
+    Round.addPoint('L');
+    setTimeout(()=>{ ['A','B','C','D'].forEach(pid=>respawnPlayer(pid)); }, 1100);
+    return;
+  }
+  setTimeout(()=>{ respawnPlayer(id); }, 1400);
+}
+</script>
+<script>
+/* initGameModeOnLoad */
+window.addEventListener('load', function(){
+  try{
+    var mode = (document.getElementById('gameMode')?.value) || '1v1';
+    if (window.setGameMode) window.setGameMode(mode);
+    if (window.__COSMO_CORE__ && typeof window.__COSMO_CORE__.resetUniverseForMode==='function'){
+      window.__COSMO_CORE__.resetUniverseForMode(mode);
+    }
+  }catch(e){}
+});
+// ========= KILL/RESPAWN GENÉRICO (A,B,C,D) & FIM DE ROUND =========
+function heroDied(id){
+  Round.markAlive(id, false);
+  const mode = (U.gameMode && U.gameMode.value) || '2v2';
+  if(mode==='1v1'){
+    const winner = (id==='A') ? 'R' : 'L';
+    Round.addPoint(winner);
+    setTimeout(()=>{ respawnPlayer('A'); respawnPlayer('B'); }, 900);
+    return;
+  }
+  if (Round.teamWiped(Round.teamL)){
+    Round.addPoint('R');
+    setTimeout(()=>{ ['A','B','C','D'].forEach(pid=>respawnPlayer(pid)); }, 1100);
+    return;
+  }
+  if (Round.teamWiped(Round.teamR)){
+    Round.addPoint('L');
+    setTimeout(()=>{ ['A','B','C','D'].forEach(pid=>respawnPlayer(pid)); }, 1100);
+    return;
+  }
+  setTimeout(()=>{ respawnPlayer(id); }, 1400);
+}
+</script>
+
+
+<script>
+// === Overrides adicionados (respawn 2x2 + placar correto) ===
+(function(){
+  const { U } = window.__COSMO_CFG__ || {};
+  if(!U) return;
+
+  // Rebind resetBattle para respawn coerente ao modo
+  U.resetBattle.onclick = () => {
+    const mode = (U.gameMode && U.gameMode.value) || '2v2';
+    window.__COSMO_ROUND__?.setScore(0,0);
+    window.__COSMO_ROUND__?.resetLivesForMode(mode);
+    if(window.__COSMO_CORE__ && typeof window.__COSMO_CORE__.resetBattle==='function'){
+      window.__COSMO_CORE__.resetBattle();
+    }
+    const slots = (mode==='2v2') ? ['A','B','C','D'] : ['A','B'];
+    slots.forEach(pid => (typeof respawnPlayer==='function') && respawnPlayer(pid, {center:true}));
+    (typeof syncScoreboard==='function') && syncScoreboard();
+  };
+
+  // Listener extra para mudança de modo (garante vidas/placar)
+  const onModeChange = () => {
+    const mode = (U.gameMode && U.gameMode.value) || '2v2';
+    (window.setGameMode||window.setGameMode)?.(mode);
+    if(window.__COSMO_CORE__ && typeof window.__COSMO_CORE__.resetUniverseForMode==='function'){
+      window.__COSMO_CORE__.resetUniverseForMode(mode);
+    }
+    window.__COSMO_ROUND__?.resetLivesForMode(mode);
+    window.__COSMO_ROUND__?.setScore(0,0);
+  };
+  U.gameMode && U.gameMode.addEventListener('input', onModeChange);
+  U.gameMode && U.gameMode.addEventListener('change', onModeChange);
+})();
+</script>
+
+<script>
+// === Overrides adicionados (respawn 2x2 + placar correto) ===
+(function(){
+  const C = window.__COSMO_CFG__ || {};
+  const U = C.U;
+  if(!U) return;
+
+  // Rebind resetBattle para respawn coerente ao modo
+  U.resetBattle.onclick = () => {
+    const mode = (U.gameMode && U.gameMode.value) || '2v2';
+    window.__COSMO_ROUND__?.setScore(0,0);
+    window.__COSMO_ROUND__?.resetLivesForMode(mode);
+    if(window.__COSMO_CORE__ && typeof window.__COSMO_CORE__.resetBattle==='function'){
+      window.__COSMO_CORE__.resetBattle();
+    }
+    const slots = (mode==='2v2') ? ['A','B','C','D'] : ['A','B'];
+    slots.forEach(pid => (typeof respawnPlayer==='function') && respawnPlayer(pid, {center:true}));
+    (typeof syncScoreboard==='function') && syncScoreboard();
+  };
+
+  // Listener extra para mudança de modo (garante vidas/placar)
+  const onModeChange = () => {
+    const mode = (U.gameMode && U.gameMode.value) || '2v2';
+    (window.setGameMode||window.setGameMode)?.(mode);
+    if(window.__COSMO_CORE__ && typeof window.__COSMO_CORE__.resetUniverseForMode==='function'){
+      window.__COSMO_CORE__.resetUniverseForMode(mode);
+    }
+    window.__COSMO_ROUND__?.resetLivesForMode(mode);
+    window.__COSMO_ROUND__?.setScore(0,0);
+  };
+  if (!U.__modePatched){
+    U.gameMode && U.gameMode.addEventListener('input', onModeChange);
+    U.gameMode && U.gameMode.addEventListener('change', onModeChange);
+    U.__modePatched = true;
+  }
+})();
+</script>
+
+<script>
+// ========= KILL/RESPAWN GENÉRICO (A,B,C,D) & FIM DE ROUND =========
+(function(){
+  function respawnPlayer(id, opts){
+    const C = window.__COSMO_CFG__||{}; const teamCfg = C.teamCfg || window.teamCfg;
+    if(!teamCfg) return;
+    const cfg = id==='A'?teamCfg.A: id==='B'?teamCfg.B: id==='C'?teamCfg.C: teamCfg.D;
+    if(!cfg) return;
+    if (window.__COSMO_CORE__ && typeof window.__COSMO_CORE__.spawnHero === 'function'){
+      window.__COSMO_CORE__.spawnHero(id, cfg, opts||{});
+      window.__COSMO_ROUND__?.markAlive?.(id, true);
+    } else if (typeof window.spawnHero === 'function'){
+      window.spawnHero(id, cfg, opts||{});
+      window.__COSMO_ROUND__?.markAlive?.(id, true);
+    }
+  }
+  window.respawnPlayer = window.respawnPlayer || respawnPlayer;
+
+  window.heroDied = function(id){
+    Round?.markAlive?.(id, false);
+    const U = (window.__COSMO_CFG__||{}).U || {};
+    const mode = (U.gameMode && U.gameMode.value) || '2v2';
+    if(mode==='1v1'){
+      Round?.addPoint?.(id==='A' ? 'R' : 'L');
+      return;
+    }
+    if (Round?.teamWiped?.(Round.teamL)){ Round.addPoint('R'); return; }
+    if (Round?.teamWiped?.(Round.teamR)){ Round.addPoint('L'); return; }
+    // Sem wipe: respawn automático pelo engine (tryRespawn) — não forçar aqui.
+  };
+
+  // Reset batalha coerente com o modo
+  (function(){
+    const C = window.__COSMO_CFG__||{}; const U = C.U||{};
+    if(!U || !U.resetBattle) return;
+    U.resetBattle.onclick = () => {
+      const mode = (U.gameMode && U.gameMode.value) || '2v2';
+      window.__COSMO_ROUND__?.setScore(0,0);
+      window.__COSMO_ROUND__?.resetLivesForMode(mode);
+      if(window.__COSMO_CORE__ && typeof window.__COSMO_CORE__.resetBattle==='function'){
+        window.__COSMO_CORE__.resetBattle();
+      }
+      const slots = (mode==='2v2') ? ['A','B','C','D'] : ['A','B'];
+      slots.forEach(pid => window.respawnPlayer && window.respawnPlayer(pid, {center:true}));
+      if (typeof window.syncScoreboard==='function') window.syncScoreboard();
+    };
+  })();
+
+  // Troca de modo: zera placar e vidas
+  (function(){
+    const C = window.__COSMO_CFG__||{}; const U = C.U||{};
+    const onModeChange = () => {
+      const mode = (U.gameMode && U.gameMode.value) || '2v2';
+      window.__COSMO_ROUND__?.resetLivesForMode(mode);
+      window.__COSMO_ROUND__?.setScore(0,0);
+    };
+    if(U && U.gameMode && !U.__modePatched){
+      U.gameMode.addEventListener('input', onModeChange);
+      U.gameMode.addEventListener('change', onModeChange);
+      U.__modePatched = true;
+    }
+  })();
+})();
+</script>
+
+</body>
+</html>
